@@ -100,4 +100,4 @@ RUN cmake3 -DCMAKE_INSTALL_PREFIX="$CMAKE_INSTALL_PREFIX" \
     ../
 
 VOLUME [ "/output" ]
-CMD [ "/bin/bash", "-c", "make -j 4 && cpack3 -G RPM && cp *.rpm /output/" ]
+CMD [ "/bin/bash", "-c", "time make -j 4 && time cpack3 -G RPM && time cp *.rpm /output/" ]

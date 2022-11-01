@@ -93,6 +93,8 @@ then
     exit 1
 fi
 
+echo "$(date -uR): Successfully created builder image"
+
 # Compile and package
 if ! docker run \
     -v "$volume":/output \
@@ -102,6 +104,4 @@ then
     exit 1
 fi
 
-echo
-echo "Package(s) generated at: $volume"
-echo
+echo "$(date -uR): Package(s) generated at: $volume"
