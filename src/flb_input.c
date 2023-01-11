@@ -61,7 +61,7 @@ struct flb_libco_in_params libco_in_param;
  * awaiting to be consumed.
  */
 
-#define FLB_INPUT_RING_BUFFER_SIZE   (sizeof(void *) * 1024)
+#define FLB_INPUT_RING_BUFFER_SIZE   (sizeof(void *) * 1024 * 1024)
 #define FLB_INPUT_RING_BUFFER_WINDOW (5)
 
 
