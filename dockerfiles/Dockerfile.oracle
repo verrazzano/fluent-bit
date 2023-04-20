@@ -1,26 +1,20 @@
-FROM ghcr.io/oracle/oraclelinux:8-slim as builder-base
+FROM ghcr.io/verrazzano/verrazzano-base:v1.0.0-20230327155846-4653b27 as builder-base
 
 RUN mkdir -p /fluent-bit/bin /fluent-bit/etc /fluent-bit/log
 
 ENV REPOURL=https://yum.oracle.com/repo/OracleLinux/OL8/appstream/x86_64/getPackage
-RUN microdnf update -y \
-    && microdnf --enablerepo=ol8_codeready_builder install -y \
-    curl \
-    ca-certificates \
+RUN microdnf --enablerepo=ol8_codeready_builder install -y \
     cmake \
     git \
     make \
     gcc \
     gcc-c++ \
-    tar \
-    openssl openssl-libs openssl-devel \
-    cyrus-sasl-lib cyrus-sasl-devel \
-    pkg-config \
+    openssl openssl-devel \
+    cyrus-sasl-devel \
     systemd-devel \
     zlib-devel \
     libpq-13.5-1.el8.x86_64 \
     libicu libicu-devel \
-    postgresql-devel \
     flex \
     bison \
     libyaml-devel \
