@@ -1,4 +1,4 @@
-FROM ghcr.io/oracle/oraclelinux:9-slim as builder-base
+FROM ghcr.io/verrazzano/verrazzano-base-ol9:v1.0.0-20230627070315-744eefa as builder-base
 
 RUN mkdir -p /fluent-bit/bin /fluent-bit/etc /fluent-bit/log
 RUN microdnf update
