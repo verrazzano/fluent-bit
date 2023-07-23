@@ -19,7 +19,7 @@
 #include "oci_logan.h"
 #include "oci_logan_conf.h"
 
-static int create_pk_context(const char *filepath, const char *key_passphrase,
+static int create_pk_context(flb_sds_t filepath, const char *key_passphrase,
                              struct flb_oci_logan *ctx)
 {
     int ret, tmp_len;
@@ -28,10 +28,11 @@ static int create_pk_context(const char *filepath, const char *key_passphrase,
     FILE *fp;
     flb_sds_t kbuffer;
 
+
     ret = stat(filepath, &st);
     if (ret == -1) {
         flb_errno();
-        flb_plg_error(ctx->ins, "cannot open key file", filepath);
+        flb_plg_error(ctx->ins, "cannot open key file %s", filepath);
         return -1;
     }
 
@@ -79,25 +80,28 @@ static int create_pk_context(const char *filepath, const char *key_passphrase,
 static int load_oci_credentials(struct flb_oci_logan *ctx)
 {
     flb_sds_t content;
-    int found_profile = 0;
+    int found_profile = 0, res = 0;
     char *line, *profile;
     int eq_pos = 0;
     char* key;
     char* val;
 
     content = flb_file_read(ctx->config_file_location);
-    if (content == NULL || flb_sds_len(content))
+    if (content == NULL || flb_sds_len(content) == 0)
     {
         return -1;
     }
+    flb_plg_info(ctx->ins, "content = %s", content);
     line = strtok(content, "\n");
     while(line != NULL) {
         // process line
+        flb_plg_info(ctx->ins, "line = %s", line);
         if(!found_profile && line[0] == '[') {
             profile = mk_string_copy_substr(line, 1, strlen(line) - 1);
             if(!strcmp(profile, ctx->profile_name)) {
+                flb_plg_info(ctx->ins, "found profile");
                 found_profile = 1;
-                continue;
+                goto iterate;
             }
         }
         if(found_profile) {
@@ -105,34 +109,45 @@ static int load_oci_credentials(struct flb_oci_logan *ctx)
                 break;
             }
             eq_pos = mk_string_char_search(line, '=', strlen(line));
-            key = mk_string_copy_substr(line, 0, eq_pos - 1);
-            val = mk_string_copy_substr(line, eq_pos + 1, strlen(line));
-            if (strcmp(key, FLB_OCI_PARAM_USER)) {
-                ctx->user = val;
+            flb_plg_info(ctx->ins, "eq_pos %d", eq_pos);
+            key = mk_string_copy_substr(line, 0, eq_pos);
+            flb_plg_info(ctx->ins, "key = %s", key);
+            val = line + eq_pos + 1;
+            if (!key || !val) {
+                res = -1;
+                break;
             }
-            else if (strcmp(key, FLB_OCI_PARAM_TENANCY)) {
-                ctx->tenancy = val;
+            if (strcmp(key, FLB_OCI_PARAM_USER) == 0) {
+                ctx->user = flb_sds_create(val);
+                flb_plg_info(ctx->ins, "val = %s", val);
             }
-            else if (strcmp(key, FLB_OCI_PARAM_KEY_FILE)) {
-                ctx->key_file = val;
+            else if (strcmp(key, FLB_OCI_PARAM_TENANCY) == 0) {
+                ctx->tenancy = flb_sds_create(val);
+                // flb_plg_info(ctx->ins, "val = %s", val);
             }
-            else if (strcmp(key, FLB_OCI_PARAM_KEY_FINGERPRINT)) {
-                ctx->key_fingerprint = val;
+            else if (strcmp(key, FLB_OCI_PARAM_KEY_FILE) == 0) {
+                ctx->key_file = flb_sds_create(val);
+                // flb_plg_info(ctx->ins, "val = %s", val);
+            }
+            else if (strcmp(key, FLB_OCI_PARAM_KEY_FINGERPRINT) == 0) {
+                ctx->key_fingerprint = flb_sds_create(val);
+                // flb_plg_info(ctx->ins, "val = %s", val);
             }
             else {
-                continue;
+                flb_plg_info(ctx->ins, "did not match");
+                goto iterate;
             }
         }
+        iterate:
         line = strtok(NULL, "\n");
     }
+    if (!found_profile) {
+        flb_errno();
+        res = -1;
+    }
 
-    flb_free(line);
-    flb_free(profile);
-    flb_free(key);
-    flb_free(val);
     flb_sds_destroy(content);
-
-    return 0;
+    return res;
 }
 
 static int global_metadata_fields_create(struct flb_oci_logan *ctx)
@@ -229,6 +244,8 @@ struct flb_oci_logan *flb_oci_logan_conf_create(struct flb_output_instance *ins,
         return NULL;
     }
 
+    ctx->ins = ins;
+
     ret = flb_output_config_map_set(ins, (void *) ctx);
     if (ret == -1) {
         flb_plg_error(ctx->ins, "configuration error");
@@ -252,11 +269,6 @@ struct flb_oci_logan *flb_oci_logan_conf_create(struct flb_output_instance *ins,
     }
      */
 
-    tmp = flb_output_get_property("config_file_location", ctx->ins);
-    if(tmp) {
-        ctx->config_file_location = (char *)tmp;
-    }
-
 
     ret = load_oci_credentials(ctx);
     if(ret != 0) {
@@ -270,43 +282,10 @@ struct flb_oci_logan *flb_oci_logan_conf_create(struct flb_output_instance *ins,
         flb_oci_logan_conf_destroy(ctx);
         return NULL;
     }
-    tmp = flb_output_get_property(FLB_OCI_PARAM_URI, ins);
-    if (tmp) {
-        ctx->uri = flb_sds_create(tmp);
-    }
-    else {
-        flb_plg_error(ctx->ins, "URI is required");
-        flb_oci_logan_conf_destroy(ctx);
-        return NULL;
-    }
-
-    tmp = flb_output_get_property("oci_la_log_group_id", ins);
-    if (tmp) {
-        ctx->oci_la_log_group_id = flb_sds_create(tmp);
-    }
-    tmp = flb_output_get_property("oci_la_log_set_id", ins);
-    if (tmp) {
-        ctx->oci_la_log_set_id = flb_sds_create(tmp);
-    }
-    tmp = flb_output_get_property("oci_la_entity_id", ins);
-    if (tmp) {
-        ctx->oci_la_entity_id = flb_sds_create(tmp);
-    }
-    tmp = flb_output_get_property("oci_la_entity_type", ins);
-    if (tmp) {
-        ctx->oci_la_entity_id = flb_sds_create(tmp);
-    }
-    tmp = flb_output_get_property("oci_la_log_source_name", ins);
-    if (tmp) {
-        ctx->oci_la_log_source_name = flb_sds_create(tmp);
-    }
-    tmp = flb_output_get_property("oci_la_log_path", ins);
-    if (tmp) {
-        ctx->oci_la_log_path = flb_sds_create(tmp);
-    }
 
 
-    if (create_pk_context(ctx->key_file, ctx->passphrase, ctx) < 0) {
+
+    if (create_pk_context(ctx->key_file, NULL, ctx) < 0) {
         flb_plg_error(ctx->ins, "failed to create pk context");
         flb_oci_logan_conf_destroy(ctx);
         return NULL;
@@ -413,6 +392,15 @@ int flb_oci_logan_conf_destroy(struct flb_oci_logan *ctx) {
     }
     if (ctx->key_file) {
         flb_sds_destroy(ctx->key_file);
+    }
+    if(ctx->user) {
+        flb_sds_destroy(ctx->user);
+    }
+    if(ctx->key_fingerprint) {
+        flb_sds_destroy(ctx->key_fingerprint);
+    }
+    if(ctx->tenancy) {
+        flb_sds_destroy(ctx->tenancy);
     }
 
     flb_free(ctx);

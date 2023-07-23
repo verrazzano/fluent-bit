@@ -561,6 +561,7 @@ static int cb_oci_logan_init(struct flb_output_instance *ins,
         flb_plg_error(ins, "cannot initialize plugin");
         return -1;
     }
+    flb_plg_info(ins, "initialized logan plugin");
     flb_output_set_context(ins, ctx);
     flb_output_set_http_debug_callbacks(ins);
 
@@ -1124,4 +1125,5 @@ struct flb_output_plugin out_oci_logan_plugin = {
 
     /* Plugin flags */
     .flags          = FLB_OUTPUT_NET | FLB_IO_OPT_TLS,
+    .workers = 1,
 };
