@@ -581,7 +581,7 @@ static flb_sds_t compose_uri(struct flb_oci_logan *ctx,
     }
 
     // LogGroupId
-    if (log_group_id) {
+    if (flb_sds_len(log_group_id) > 0) {
         if (flb_sds_len(uri_param) > 0) {
             uri_param = flb_sds_cat(uri_param, "&", 1);
         }
@@ -597,7 +597,7 @@ static flb_sds_t compose_uri(struct flb_oci_logan *ctx,
     }
 
     // logSet
-    if (log_set) {
+    if (flb_sds_len(log_set) > 0) {
         if (flb_sds_len(uri_param) > 0) {
             uri_param = flb_sds_cat(uri_param, "&", 1);
         }
@@ -662,6 +662,8 @@ static int flush_to_endpoint(struct flb_oci_logan *ctx,
                       ctx->oci_la_log_group_id, ctx->oci_la_log_set_id);
     }
 
+    flb_plg_info(ctx->ins, "full_uri=%s", full_uri);
+
     u_conn = flb_upstream_conn_get(ctx->u);
     if(!u_conn) {
         goto error_label;
@@ -672,16 +674,18 @@ static int flush_to_endpoint(struct flb_oci_logan *ctx,
     if (!c) {
         goto error_label;
     }
+    flb_plg_info(ctx->ins, "built client");
     flb_http_buffer_size(c, FLB_HTTP_DATA_SIZE_MAX);
     if (build_headers(c, ctx, payload, ctx->ins->host.name, ctx->ins->host.port, full_uri) < 0) {
         flb_plg_error(ctx->ins, "failed to build headers");
         goto error_label;
     }
+    flb_plg_info(ctx->ins, "built request");
 
     out_ret = FLB_OK;
 
     http_ret = flb_http_do(c, &b_sent);
-    http_ret = flb_http_do(c, &b_sent);
+    flb_plg_info(ctx->ins, "placed request");
     if (http_ret == 0) {
 
         if (c->resp.status != 200) {
@@ -950,7 +954,7 @@ static int total_flush(struct flb_event_chunk *event_chunk,
     struct flb_oci_logan *ctx = out_context;
     struct flb_connection *uconn;
     struct flb_http_client *c;
-    void *out_buf;
+    void *out_buf = NULL;
     size_t out_size;
     int ret = -1;
     msgpack_object map;
@@ -960,6 +964,8 @@ static int total_flush(struct flb_event_chunk *event_chunk,
     struct flb_log_event_decoder log_decoder;
     struct flb_log_event log_event;
     int num_records;
+
+    flb_plg_info(ctx->ins, "data=%s", (char *)event_chunk->data);
 
     ret = flb_log_event_decoder_init(&log_decoder, (char *) event_chunk->data, event_chunk->size);
 
@@ -990,7 +996,7 @@ static int total_flush(struct flb_event_chunk *event_chunk,
         &log_event)) == FLB_EVENT_DECODER_SUCCESS) {
         map      = *log_event.body;
         map_size = map.via.map.size;
-
+        flb_plg_info(ctx->ins, "processing event");
         msgpack_pack_map(&mp_pck, map_size);
 
         for(int i = 0; i < map_size; i++) {
@@ -1000,6 +1006,8 @@ static int total_flush(struct flb_event_chunk *event_chunk,
     }
 
     out_buf = flb_msgpack_raw_to_json_sds(&mp_sbuf.data, mp_sbuf.size);
+
+    flb_plg_info(ctx->ins, "out_buf=%s", (char *)out_buf);
 
     ret = flush_to_endpoint(ctx, out_buf);
     if(ret != 0) {
@@ -1026,10 +1034,11 @@ static void cb_oci_logan_flush(struct flb_event_chunk *event_chunk,
         ret = total_flush(event_chunk, out_flush,
                           ins, out_context,
                           config);
-        if (!ret) {
+        if (ret != 0) {
             flb_oci_logan_conf_destroy(ctx);
             FLB_OUTPUT_RETURN(FLB_RETRY);
         }
+        flb_plg_info(ctx->ins, "success");
     }
 
     FLB_OUTPUT_RETURN(FLB_OK);
