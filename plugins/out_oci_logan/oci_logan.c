@@ -12,9 +12,31 @@
 #include <fluent-bit/flb_crypto.h>
 #include <fluent-bit/flb_base64.h>
 #include <fluent-bit/flb_hash.h>
+#include <fluent-bit/flb_sds.h>
+
+#include <monkey/mk_core/mk_list.h>
+#include <msgpack.h>
+
+#include <string.h>
 
 #include "oci_logan_conf.h"
 #include "oci_logan.h"
+
+
+static int check_config_from_record(msgpack_object key,
+                                   char *name, int len)
+{
+    if (key.type != MSGPACK_OBJECT_STR) {
+        return FLB_FALSE;
+    }
+
+    if (key.via.str.size != len) {
+        return FLB_FALSE;
+    }
+
+
+    return memcmp(key.via.str.ptr, name, len) == 0;
+}
 
 /*
  * Authorization: Signature version="1",keyId="<tenancy_ocid>/<user_ocid>/<key_fingerprint>",
@@ -481,76 +503,6 @@ static int retry_error(struct flb_http_client *c, struct flb_oci_logan *ctx)
     return ret;
 }
 
-
-/*
- * compose uri, check if it already exists, get the
- */
-static int oci_logan_format(struct flb_config *config,
-                            struct flb_input_instance *ins,
-                            void *plugin_context,
-                            void *flush_ctx,
-                            int event_type,
-                            const char *tag, int tag_len,
-                            const void *data, size_t bytes,
-                            void **out_data, size_t *out_size)
-{
-    int ret = -1;
-    struct flb_oci_logan *ctx = plugin_context;
-    msgpack_object map;
-    int map_size;
-    msgpack_sbuffer tmp_sbuf;
-    msgpack_packer tmp_pck;
-    struct flb_log_event_decoder log_decoder;
-    struct flb_log_event log_event;
-
-    ret = flb_log_event_decoder_init(&log_decoder, (char *) data, bytes);
-
-    if (ret != FLB_EVENT_DECODER_SUCCESS) {
-        flb_plg_error(ctx->ins,
-                      "Log event decoder initialization error : %d", ret);
-
-        return -1;
-    }
-
-
-    while ((ret = flb_log_event_decoder_next(
-        &log_decoder,
-        &log_event)) == FLB_EVENT_DECODER_SUCCESS) {
-
-        map      = *log_event.body;
-        map_size = map.via.map.size;
-
-        /* Create temporary msgpack buffer */
-        msgpack_sbuffer_init(&tmp_sbuf);
-        msgpack_packer_init(&tmp_pck, &tmp_sbuf, msgpack_sbuffer_write);
-
-        /* Set the new map size */
-        msgpack_pack_map(&tmp_pck, map_size + 2);
-        msgpack_pack_str(&tmp_pck, FLB_OCI_LOG_METADATA_SIZE);
-        msgpack_pack_str_body(&tmp_pck, FLB_OCI_LOG_METADATA, FLB_OCI_LOG_METADATA_SIZE);
-
-        msgpack_pack_array(&tmp_pck, 4);
-
-
-    }
-
-
-        return 0;
-}
-
-/*
- * 1. Split records based on oci_la_* configs and populate them into a list
- * 2. Iterate through the list, construct payload and flush the content
- */
-static int flush_per_log_event(struct flb_event_chunk *event_chunk,
-                            struct flb_output_flush *out_flush,
-                            struct flb_input_instance *ins, void *out_context,
-                            struct flb_config *config)
-{
-
-    return 0;
-}
-
 static int cb_oci_logan_init(struct flb_output_instance *ins,
                              struct flb_config *config,
                              void *data)
@@ -581,7 +533,7 @@ static flb_sds_t compose_uri(struct flb_oci_logan *ctx,
     }
 
     // LogGroupId
-    if (flb_sds_len(log_group_id) > 0) {
+    if (log_group_id) {
         if (flb_sds_len(uri_param) > 0) {
             uri_param = flb_sds_cat(uri_param, "&", 1);
         }
@@ -597,7 +549,7 @@ static flb_sds_t compose_uri(struct flb_oci_logan *ctx,
     }
 
     // logSet
-    if (flb_sds_len(log_set) > 0) {
+    if (log_set) {
         if (flb_sds_len(uri_param) > 0) {
             uri_param = flb_sds_cat(uri_param, "&", 1);
         }
@@ -647,7 +599,9 @@ static flb_sds_t compose_uri(struct flb_oci_logan *ctx,
 }
 
 static int flush_to_endpoint(struct flb_oci_logan *ctx,
-                             flb_sds_t payload)
+                             flb_sds_t payload,
+                             flb_sds_t log_group_id,
+                             flb_sds_t log_set_id)
 {
     int out_ret = FLB_RETRY;
     int http_ret;
@@ -656,7 +610,7 @@ static int flush_to_endpoint(struct flb_oci_logan *ctx,
     struct flb_http_client *c = NULL;
     struct flb_connection *u_conn;
 
-    full_uri = compose_uri(ctx, ctx->oci_la_log_set_id, ctx->oci_la_log_group_id);
+    full_uri = compose_uri(ctx, log_set_id, log_group_id);
     if(!full_uri) {
         flb_plg_error(ctx->ins, "unable to compose uri for logGroup: %s logSet: %s",
                       ctx->oci_la_log_group_id, ctx->oci_la_log_set_id);
@@ -686,6 +640,8 @@ static int flush_to_endpoint(struct flb_oci_logan *ctx,
 
     http_ret = flb_http_do(c, &b_sent);
     flb_plg_info(ctx->ins, "placed request");
+    flb_plg_info(ctx->ins, "request header %s", c->header_buf);
+
     if (http_ret == 0) {
 
         if (c->resp.status != 200) {
@@ -736,96 +692,6 @@ error_label:
 
     return out_ret;
 
-}
-static int flush_to_http(struct flb_oci_logan *ctx,
-                         flb_sds_t payload,
-                         struct flb_connection *u_conn, int* resp_status)
-{
-    int http_ret;
-    int out_ret;
-    size_t b_sent;
-    flb_sds_t hostname;
-    int port;
-    flb_sds_t full_uri;
-    struct flb_http_client *c;
-
-
-    out_ret = FLB_ERROR;
-    *resp_status = -1;
-    hostname = ctx->ins->host.name;
-    port = ctx->ins->host.port;
-
-    full_uri = compose_uri(ctx, ctx->oci_la_log_set_id, ctx->oci_la_log_group_id);
-    if (!full_uri) {
-        goto error_label;
-    }
-
-    /* Create HTTP client context */
-    c = flb_http_client(u_conn, FLB_HTTP_POST, full_uri, (void*) payload,
-                        flb_sds_len(payload), hostname, port, NULL, 0);
-    if (!c) {
-        goto error_label;
-    }
-    flb_http_buffer_size(c, FLB_HTTP_DATA_SIZE_MAX);
-
-    // To overwrite headers
-    c->allow_dup_headers = FLB_FALSE;
-
-    if (build_headers(c, ctx, payload, hostname, port, full_uri) < 0) {
-        flb_plg_error(ctx->ins, "failed to build headers");
-        goto error_label;
-    }
-
-    out_ret = FLB_OK;
-
-    http_ret = flb_http_do(c, &b_sent);
-    if (http_ret == 0) {
-        *resp_status = c->resp.status;
-
-        if (c->resp.status != 200) {
-
-            out_ret = FLB_ERROR;
-
-            if (c->resp.payload && c->resp.payload_size > 0) {
-                if (retry_error(c, ctx) == FLB_TRUE) {
-                    out_ret = FLB_RETRY;
-                }
-
-                flb_plg_error(ctx->ins, "%s:%i, retry=%s, HTTP status=%i\n%s",
-                              hostname, port,
-                              (out_ret == FLB_RETRY ? "true" : "false"),
-                              c->resp.status, c->resp.payload);
-            }
-            else {
-                flb_plg_error(ctx->ins, "%s:%i, retry=%s, HTTP status=%i",
-                              hostname, port,
-                              (out_ret == FLB_RETRY ? "true" : "false"),
-                              c->resp.status);
-            }
-        }
-    }
-    else {
-        out_ret = FLB_RETRY;
-        flb_plg_error(ctx->ins, "could not flush records to %s:%i (http_do=%i), retry=%s",
-                      hostname, port, http_ret, (out_ret == FLB_RETRY ? "true" : "false"));
-    }
-
-    error_label:
-    if (full_uri) {
-        flb_sds_destroy(full_uri);
-    }
-
-    /* Destroy HTTP client context */
-    if (c) {
-        flb_http_client_destroy(c);
-    }
-
-    /* Release the TCP connection */
-    if (u_conn) {
-        flb_upstream_conn_release(u_conn);
-    }
-
-    return out_ret;
 }
 
 static void pack_oci_fields(msgpack_packer *packer,
@@ -898,24 +764,43 @@ static void pack_oci_fields(msgpack_packer *packer,
     msgpack_pack_array(packer, 1);
 
     if (num_event_meta > 0) {
-        msgpack_pack_map(packer, 5); // entityId, logSourceName, logPath, metadata, logRecords
+        msgpack_pack_map(packer, 6); // entityId, logSourceName, logPath, metadata, logRecords
     }
     else {
-        msgpack_pack_map(packer, 4); // entityId, logSourceName, logPath, logRecords
+        msgpack_pack_map(packer, 5); // entityId, logSourceName, logPath, logRecords
     }
+
+    /* "entityType:"" */
+    msgpack_pack_str(packer, FLB_OCI_ENTITY_TYPE_SIZE);
+    msgpack_pack_str_body(packer, FLB_OCI_ENTITY_TYPE, FLB_OCI_ENTITY_TYPE_SIZE);
+    msgpack_pack_str(packer, flb_sds_len(ctx->oci_la_entity_type));
+    msgpack_pack_str_body(packer, ctx->oci_la_entity_type,
+                          flb_sds_len(ctx->oci_la_entity_type));
 
     /* "entityId":"", */
     msgpack_pack_str(packer, FLB_OCI_ENTITY_ID_SIZE);
     msgpack_pack_str_body(packer, FLB_OCI_ENTITY_ID, FLB_OCI_ENTITY_ID_SIZE);
+    msgpack_pack_str(packer, flb_sds_len(ctx->oci_la_entity_id));
+    msgpack_pack_str_body(packer, ctx->oci_la_entity_id,
+                          flb_sds_len(ctx->oci_la_entity_id));
 
-    /* "logSourceName":"LinuxSyslogSource", */
+
+    /* "logSourceName":"", */
     msgpack_pack_str(packer, FLB_OCI_LOG_SOURCE_NAME_SIZE);
     msgpack_pack_str_body(packer, FLB_OCI_LOG_SOURCE_NAME,
                           FLB_OCI_LOG_SOURCE_NAME_SIZE);
+    msgpack_pack_str(packer, flb_sds_len(ctx->oci_la_log_source_name));
+    msgpack_pack_str_body(packer, ctx->oci_la_log_source_name,
+                          flb_sds_len(ctx->oci_la_log_source_name));
 
-    /* "logPath":"/var/log/messages" */
+
+    /* "logPath":"" */
     msgpack_pack_str(packer, FLB_OCI_LOG_PATH_SIZE);
     msgpack_pack_str_body(packer, FLB_OCI_LOG_PATH, FLB_OCI_LOG_PATH_SIZE);
+    msgpack_pack_str(packer, flb_sds_len(ctx->oci_la_log_path));
+    msgpack_pack_str_body(packer, ctx->oci_la_log_path,
+                          flb_sds_len(ctx->oci_la_log_path));
+
 
     // Add metadata
     if (num_event_meta > 0) {
@@ -946,17 +831,190 @@ static void pack_oci_fields(msgpack_packer *packer,
     }
 }
 
+static int get_and_pack_oci_fields_from_record(msgpack_packer *packer,
+                                   msgpack_object map,
+                                   flb_sds_t *lg_id,
+                                   flb_sds_t *ls_id)
+{
+    int map_size = map.via.map.size;
+    msgpack_object *log_group_id= NULL;
+    msgpack_object *log_set_id = NULL;
+    msgpack_object *entity_id = NULL;
+    msgpack_object *entity_type = NULL;
+    msgpack_object *log_path = NULL;
+    msgpack_object *log_source = NULL;
+    msgpack_object *global_metadata = NULL;
+    msgpack_object *metadata = NULL;
+
+    for(int i = 0; i < map_size; i++) {
+        if (check_config_from_record(map.via.map.ptr[i].key,
+                                     FLB_OCI_LOG_GROUP_ID_KEY,
+                                     FLB_OCI_LOG_GROUP_ID_KEY_SIZE) == FLB_TRUE) {
+            if (map.via.map.ptr[i].val.type == MSGPACK_OBJECT_STR) {
+                log_group_id = &map.via.map.ptr[i].val;
+            }
+            continue;
+        }
+        else if (check_config_from_record(map.via.map.ptr[i].key,
+                                     FLB_OCI_LOG_SET_ID_KEY,
+                                     FLB_OCI_LOG_SET_ID_KEY_SIZE) == FLB_TRUE) {
+            if (map.via.map.ptr[i].val.type == MSGPACK_OBJECT_STR) {
+                log_set_id = &map.via.map.ptr[i].val;
+            }
+            continue;
+        }
+        else if (check_config_from_record(map.via.map.ptr[i].key,
+                                     FLB_OCI_LOG_ENTITY_ID_KEY,
+                                     FLB_OCI_LOG_ENTITY_ID_KEY_SIZE) == FLB_TRUE) {
+            if (map.via.map.ptr[i].val.type == MSGPACK_OBJECT_STR) {
+                entity_id = &map.via.map.ptr[i].val;
+            }
+            continue;
+        }
+        else if (check_config_from_record(map.via.map.ptr[i].key,
+                                     FLB_OCI_LOG_ENTITY_TYPE_KEY,
+                                     FLB_OCI_LOG_ENTITY_TYPE_KEY_SIZE) == FLB_TRUE) {
+            if (map.via.map.ptr[i].val.type == MSGPACK_OBJECT_STR) {
+                entity_type = &map.via.map.ptr[i].val;
+            }
+            continue;
+        }
+        else if (check_config_from_record(map.via.map.ptr[i].key,
+                                     FLB_OCI_LOG_SOURCE_NAME_KEY,
+                                     FLB_OCI_LOG_SOURCE_NAME_KEY_SIZE) == FLB_TRUE) {
+            if (map.via.map.ptr[i].val.type == MSGPACK_OBJECT_STR) {
+                log_source = &map.via.map.ptr[i].val;
+            }
+            continue;
+        }
+        else if (check_config_from_record(map.via.map.ptr[i].key,
+                                     FLB_OCI_LOG_PATH_KEY,
+                                     FLB_OCI_LOG_PATH_KEY_SIZE) == FLB_TRUE) {
+            if (map.via.map.ptr[i].val.type == MSGPACK_OBJECT_STR) {
+                log_path = &map.via.map.ptr[i].val;
+            }
+            continue;
+        }
+        else if (check_config_from_record(map.via.map.ptr[i].key,
+                                     FLB_OCI_METADATA_KEY,
+                                     FLB_OCI_METADATA_KEY_SIZE) == FLB_TRUE) {
+            if (map.via.map.ptr[i].val.type == MSGPACK_OBJECT_STR) {
+                metadata = &map.via.map.ptr[i].val;
+            }
+            continue;
+        }
+        else if (check_config_from_record(map.via.map.ptr[i].key,
+                                     FLB_OCI_GLOBAL_METADATA_KEY,
+                                     FLB_OCI_GLOBAL_METADATA_KEY_SIZE) == FLB_TRUE) {
+            if (map.via.map.ptr[i].val.type == MSGPACK_OBJECT_STR) {
+                global_metadata = &map.via.map.ptr[i].val;
+            }
+            continue;
+        }
+    }
+
+    if (global_metadata != NULL) {
+        msgpack_pack_map(packer, 2);
+        msgpack_pack_str(packer, FLB_OCI_LOG_METADATA_SIZE);
+        msgpack_pack_str_body(packer, FLB_OCI_LOG_METADATA,
+                              FLB_OCI_LOG_METADATA_SIZE);
+
+        msgpack_pack_object(packer, *global_metadata);
+    }
+    else {
+        msgpack_pack_map(packer, 1);
+    }
+
+    // Add logEvents
+    /*
+     *logEvents":[
+     {
+     "entityId":"",
+     "logSourceName":"LinuxSyslogSource",
+     "logPath":"/var/log/messages",
+     "metadata":{
+     "Error ID":"1",
+     "Environment":"prod",
+     "Client Host Region":"PST"
+     },
+     "logRecords":[
+     "May  8 2017 04:02:36 blr00akm syslogd 1.4.1: shutdown.",
+     "May  8 2017 04:02:37 blr00akm syslogd 1.4.1: restart."
+     ]
+     },
+     {
+
+     }
+     ]
+     */
+    msgpack_pack_str(packer, FLB_OCI_LOG_EVENTS_SIZE);
+    msgpack_pack_str_body(packer, FLB_OCI_LOG_EVENTS, FLB_OCI_LOG_EVENTS_SIZE);
+
+    msgpack_pack_array(packer, 1);
+
+    if (metadata != NULL) {
+        msgpack_pack_map(packer, 6); // entityType, entityId, logSourceName, logPath, metadata, logRecords
+        msgpack_pack_str(packer, FLB_OCI_LOG_METADATA_SIZE);
+        msgpack_pack_str_body(packer, FLB_OCI_LOG_METADATA,
+                              FLB_OCI_LOG_METADATA_SIZE);
+        msgpack_pack_object(packer, *global_metadata);
+
+    }
+    else {
+        msgpack_pack_map(packer, 5); // entityType, entityId, logSourceName, logPath, logRecords
+    }
+
+    /* "entityType:"" */
+    msgpack_pack_str(packer, FLB_OCI_ENTITY_TYPE_SIZE);
+    msgpack_pack_str_body(packer, FLB_OCI_ENTITY_TYPE, FLB_OCI_ENTITY_TYPE_SIZE);
+    msgpack_pack_object(packer, *entity_type);
+
+    /* "entityId":"", */
+    msgpack_pack_str(packer, FLB_OCI_ENTITY_ID_SIZE);
+    msgpack_pack_str_body(packer, FLB_OCI_ENTITY_ID, FLB_OCI_ENTITY_ID_SIZE);
+    msgpack_pack_object(packer, *entity_id);
+
+
+
+    /* "logSourceName":"", */
+    msgpack_pack_str(packer, FLB_OCI_LOG_SOURCE_NAME_SIZE);
+    msgpack_pack_str_body(packer, FLB_OCI_LOG_SOURCE_NAME,
+                          FLB_OCI_LOG_SOURCE_NAME_SIZE);
+    msgpack_pack_object(packer, *log_source);
+
+
+    /* "logPath":"" */
+    msgpack_pack_str(packer, FLB_OCI_LOG_PATH_SIZE);
+    msgpack_pack_str_body(packer, FLB_OCI_LOG_PATH, FLB_OCI_LOG_PATH_SIZE);
+    msgpack_pack_object(packer, *log_path);
+
+    if (log_group_id == NULL) {
+        return -1;
+    }
+    *lg_id = flb_sds_create(log_group_id->via.str.ptr);
+    if(!*lg_id) {
+        return -1;
+    }
+    if (log_set_id != NULL) {
+        *ls_id = flb_sds_create(log_set_id->via.str.ptr);
+        if(!*ls_id) {
+            return -1;
+        }
+    }
+    return 0;
+
+}
+
 static int total_flush(struct flb_event_chunk *event_chunk,
                        struct flb_output_flush *out_flush,
                        struct flb_input_instance *ins, void *out_context,
                        struct flb_config *config)
 {
     struct flb_oci_logan *ctx = out_context;
-    struct flb_connection *uconn;
     struct flb_http_client *c;
-    void *out_buf = NULL;
+    flb_sds_t out_buf = NULL;
     size_t out_size;
-    int ret = -1;
+    int ret = -1, res = 0;
     msgpack_object map;
     int map_size;
     msgpack_sbuffer mp_sbuf;
@@ -964,16 +1022,17 @@ static int total_flush(struct flb_event_chunk *event_chunk,
     struct flb_log_event_decoder log_decoder;
     struct flb_log_event log_event;
     int num_records;
-
-    flb_plg_info(ctx->ins, "data=%s", (char *)event_chunk->data);
+    flb_sds_t log_group_id = NULL;
+    flb_sds_t log_set_id = NULL;
+    int count = 0;
 
     ret = flb_log_event_decoder_init(&log_decoder, (char *) event_chunk->data, event_chunk->size);
 
     if (ret != FLB_EVENT_DECODER_SUCCESS) {
         flb_plg_error(ctx->ins,
                       "Log event decoder initialization error : %d", ret);
-
-        return -1;
+        res = -1;
+        goto clean_up;
     }
 
     /* Create temporary msgpack buffer */
@@ -996,7 +1055,25 @@ static int total_flush(struct flb_event_chunk *event_chunk,
         &log_event)) == FLB_EVENT_DECODER_SUCCESS) {
         map      = *log_event.body;
         map_size = map.via.map.size;
-        flb_plg_info(ctx->ins, "processing event");
+
+        if (count < 1) {
+            if (ctx->oci_config_in_record == FLB_FALSE) {
+                pack_oci_fields(&mp_pck, ctx);
+                log_group_id = ctx->oci_la_log_group_id;
+                log_set_id = ctx->oci_la_log_set_id;
+            } else {
+                ret = get_and_pack_oci_fields_from_record(&mp_pck, map, &log_group_id, &log_set_id);
+                if (ret != 0) {
+                    break;
+                }
+            }
+            msgpack_pack_str(&mp_pck, FLB_OCI_LOG_RECORDS_SIZE);
+            msgpack_pack_str_body(&mp_pck, FLB_OCI_LOG_RECORDS,
+                                  FLB_OCI_LOG_RECORDS_SIZE);
+            msgpack_pack_array(&mp_pck, num_records);
+            count++;
+        }
+
         msgpack_pack_map(&mp_pck, map_size);
 
         for(int i = 0; i < map_size; i++) {
@@ -1005,15 +1082,32 @@ static int total_flush(struct flb_event_chunk *event_chunk,
         }
     }
 
-    out_buf = flb_msgpack_raw_to_json_sds(&mp_sbuf.data, mp_sbuf.size);
-
-    flb_plg_info(ctx->ins, "out_buf=%s", (char *)out_buf);
-
-    ret = flush_to_endpoint(ctx, out_buf);
-    if(ret != 0) {
-        return -1;
+    if (ret != 0) {
+        res = -1;
+        goto clean_up;
     }
-    return 0;
+
+    out_buf = flb_msgpack_raw_to_json_sds(&mp_sbuf.data, mp_sbuf.size);
+    msgpack_sbuffer_destroy(&mp_sbuf);
+    flb_log_event_decoder_destroy(&log_decoder);
+
+    ret = flush_to_endpoint(ctx, out_buf, log_group_id, log_set_id);
+    if(ret != FLB_OK) {
+        res = -1;
+        goto clean_up;
+    }
+
+    clean_up:
+    if (out_buf != NULL) {
+        flb_sds_destroy(out_buf);
+    }
+    if (log_group_id != NULL && ctx->oci_config_in_record) {
+        flb_sds_destroy(log_group_id);
+    }
+    if (log_set_id != NULL && ctx->oci_config_in_record) {
+        flb_sds_destroy(log_set_id);
+    }
+    return res;
 }
 /*
  * 1. For every chunk, group logs by logGroupId and logSet and store them in a hash table.
@@ -1074,45 +1168,56 @@ static struct flb_config_map config_map[] = {
         "If true, mapping types is removed. (for v7.0.0 or later)"
     },
     {
-        FLB_CONFIG_MAP_STR, "uri", "false",
+        FLB_CONFIG_MAP_STR, "uri", "",
         0, FLB_TRUE, offsetof(struct flb_oci_logan, uri),
         "If true, mapping types is removed. (for v7.0.0 or later)"
     },
     {
-        FLB_CONFIG_MAP_STR, "oci_la_log_group_id", "",
+        FLB_CONFIG_MAP_STR, "oci_la_log_group_id", NULL,
         0, FLB_TRUE, offsetof(struct flb_oci_logan, oci_la_log_group_id),
         "If true, mapping types is removed. (for v7.0.0 or later)"
     },
     {
-        FLB_CONFIG_MAP_STR, "oci_la_log_set_id", "",
+        FLB_CONFIG_MAP_STR, "oci_la_log_set_id", NULL,
         0, FLB_TRUE, offsetof(struct flb_oci_logan, oci_la_log_set_id),
         "If true, mapping types is removed. (for v7.0.0 or later)"
     },
     {
-        FLB_CONFIG_MAP_STR, "oci_la_entity_id", "",
+        FLB_CONFIG_MAP_STR, "oci_la_entity_id", NULL,
         0, FLB_TRUE, offsetof(struct flb_oci_logan, oci_la_entity_id),
         "If true, mapping types is removed. (for v7.0.0 or later)"
     },
     {
-        FLB_CONFIG_MAP_STR, "oci_la_entity_type", "",
+        FLB_CONFIG_MAP_STR, "oci_la_entity_type", NULL,
         0, FLB_TRUE, offsetof(struct flb_oci_logan, oci_la_entity_type),
         "If true, mapping types is removed. (for v7.0.0 or later)"
     },
     {
-        FLB_CONFIG_MAP_STR, "oci_la_log_source_name", "",
+        FLB_CONFIG_MAP_STR, "oci_la_log_source_name", NULL,
         0, FLB_TRUE, offsetof(struct flb_oci_logan, oci_la_log_source_name),
         "If true, mapping types is removed. (for v7.0.0 or later)"
     },
     {
-        FLB_CONFIG_MAP_STR, "oci_la_log_set_id", "",
+        FLB_CONFIG_MAP_STR, "oci_la_log_set_id", NULL,
         0, FLB_TRUE, offsetof(struct flb_oci_logan, oci_la_log_set_id),
         "If true, mapping types is removed. (for v7.0.0 or later)"
     },
     {
-        FLB_CONFIG_MAP_STR, "oci_la_log_path", "",
+        FLB_CONFIG_MAP_STR, "oci_la_log_path", NULL,
         0, FLB_TRUE, offsetof(struct flb_oci_logan, oci_la_log_path),
         "If true, mapping types is removed. (for v7.0.0 or later)"
     },
+    {
+        FLB_CONFIG_MAP_SLIST_2, "oci_la_global_metadata", NULL,
+        0, FLB_TRUE, offsetof(struct flb_oci_logan, oci_la_global_metadata),
+            ""
+    },
+    {
+        FLB_CONFIG_MAP_SLIST_2, "oci_la_metadata", NULL,
+        0, FLB_TRUE, offsetof(struct flb_oci_logan, oci_la_metadata),
+        ""
+    },
+
     {0}
 };
 
@@ -1134,5 +1239,5 @@ struct flb_output_plugin out_oci_logan_plugin = {
 
     /* Plugin flags */
     .flags          = FLB_OUTPUT_NET | FLB_IO_OPT_TLS,
-    .workers = 1,
+    .workers = 4,
 };

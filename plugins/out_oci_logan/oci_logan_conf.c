@@ -323,7 +323,7 @@ struct flb_oci_logan *flb_oci_logan_conf_create(struct flb_output_instance *ins,
 
     /* Prepare an upstream handler */
     upstream = flb_upstream_create(config, ins->host.name, ins->host.port,
-                                   io_flags, (void*) &ins->tls);
+                                   io_flags, ins->tls);
 
     if (!upstream) {
         flb_plg_error(ctx->ins, "cannot create Upstream context");

@@ -5,6 +5,30 @@
 #ifndef FLB_OUT_OCI_LOGAN_H
 #define FLB_OUT_OCI_LOGAN_H
 
+#define FLB_OCI_LOG_ENTITY_ID_KEY "oci_la_entity_id"
+#define FLB_OCI_LOG_ENTITY_ID_KEY_SIZE sizeof(FLB_OCI_LOG_ENTITY_ID_KEY) - 1
+
+#define FLB_OCI_LOG_ENTITY_TYPE_KEY "oci_la_entity_type"
+#define FLB_OCI_LOG_ENTITY_TYPE_KEY_SIZE sizeof(FLB_OCI_LOG_ENTITY_TYPE_KEY) - 1
+
+#define FLB_OCI_LOG_GROUP_ID_KEY "oci_la_log_group_id"
+#define FLB_OCI_LOG_GROUP_ID_KEY_SIZE sizeof(FLB_OCI_LOG_GROUP_ID_KEY) - 1
+
+#define FLB_OCI_LOG_SET_ID_KEY "oci_la_log_set_id"
+#define FLB_OCI_LOG_SET_ID_KEY_SIZE sizeof(FLB_OCI_LOG_SET_ID_KEY) - 1
+
+#define FLB_OCI_LOG_SOURCE_NAME_KEY "oci_la_log_source_name"
+#define FLB_OCI_LOG_SOURCE_NAME_KEY_SIZE sizeof(FLB_OCI_LOG_SOURCE_NAME_KEY) - 1
+
+#define FLB_OCI_LOG_PATH_KEY "oci_la_log_path"
+#define FLB_OCI_LOG_PATH_KEY_SIZE sizeof(FLB_OCI_LOG_PATH_KEY) - 1
+
+#define FLB_OCI_METADATA_KEY "oci_la_metadata"
+#define FLB_OCI_METADATA_KEY_SIZE sizeof(FLB_OCI_METADATA_KEY) - 1
+
+#define FLB_OCI_GLOBAL_METADATA_KEY "oci_la_global_metadata"
+#define FLB_OCI_GLOBAL_METADATA_KEY_SIZE sizeof(FLB_OCI_GLOBAL_METADATA_KEY) - 1
+
 #define FLB_OCI_LOG_EVENTS  "logEvents"
 #define FLB_OCI_LOG_EVENTS_SIZE sizeof(FLB_OCI_LOG_EVENTS)-1
 
@@ -13,6 +37,9 @@
 
 #define FLB_OCI_LOG_GROUP_ID "logGroupId"
 #define FLB_OCI_LOG_GROUP_ID_SIZE sizeof(FLB_OCI_LOG_GROUP_ID)-1
+
+#define FLB_OCI_ENTITY_TYPE "entityType"
+#define FLB_OCI_ENTITY_TYPE_SIZE sizeof(FLB_OCI_ENTITY_TYPE) - 1
 
 #define FLB_OCI_LOG_SET "logSet"
 #define FLB_OCI_LOG_SET_SIZE sizeof(FLB_OCI_LOG_SET)-1
