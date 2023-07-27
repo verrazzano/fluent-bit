@@ -15,6 +15,7 @@
 
 #include <monkey/mk_core/mk_list.h>
 #include <monkey/mk_core/mk_string.h>
+#include <fluent-bit/flb_utils.h>
 
 #include "oci_logan.h"
 #include "oci_logan_conf.h"
@@ -22,7 +23,7 @@
 static int create_pk_context(flb_sds_t filepath, const char *key_passphrase,
                              struct flb_oci_logan *ctx)
 {
-    int ret, tmp_len;
+    int ret;
     struct stat st;
     struct file_info finfo;
     FILE *fp;
@@ -133,8 +134,10 @@ static int load_oci_credentials(struct flb_oci_logan *ctx)
                 ctx->key_fingerprint = flb_sds_create(val);
                 // flb_plg_info(ctx->ins, "val = %s", val);
             }
+            else if (strcmp(key, FLB_OCI_PARAM_REGION) == 0) {
+                ctx->region = flb_sds_create(val);
+            }
             else {
-                flb_plg_info(ctx->ins, "did not match");
                 goto iterate;
             }
         }
@@ -235,9 +238,15 @@ struct flb_oci_logan *flb_oci_logan_conf_create(struct flb_output_instance *ins,
                                                 struct flb_config *config) {
     struct flb_oci_logan *ctx;
     struct flb_upstream *upstream;
+    flb_sds_t host = NULL;
     int io_flags = 0, default_port;
     const char *tmp;
     int ret = 0;
+    char *protocol = NULL;
+    char *p_host = NULL;
+    char *p_port = NULL;
+    char *p_uri = NULL;
+
     ctx = flb_calloc(1, sizeof(struct flb_oci_logan));
     if (!ctx) {
         flb_errno();
@@ -253,21 +262,24 @@ struct flb_oci_logan *flb_oci_logan_conf_create(struct flb_output_instance *ins,
         return NULL;
     }
 
-    /*
-    ret = global_metadata_fields_create(ctx);
-    if (ret != 0) {
-        flb_errno();
-        flb_oci_logan_conf_destroy(ctx);
-        return NULL;
+    if (ctx->oci_la_global_metadata != NULL) {
+        ret = global_metadata_fields_create(ctx);
+        if (ret != 0) {
+            flb_errno();
+            flb_oci_logan_conf_destroy(ctx);
+            return NULL;
+        }
     }
 
-    ret = log_event_metadata_create(ctx);
-    if (ret != 0) {
-        flb_errno();
-        flb_oci_logan_conf_destroy(ctx);
-        return NULL;
+    if (ctx->oci_la_metadata != NULL) {
+        ret = log_event_metadata_create(ctx);
+        if (ret != 0) {
+            flb_errno();
+            flb_oci_logan_conf_destroy(ctx);
+            return NULL;
+        }
     }
-     */
+
 
 
     ret = load_oci_credentials(ctx);
@@ -277,10 +289,31 @@ struct flb_oci_logan *flb_oci_logan_conf_create(struct flb_output_instance *ins,
         return NULL;
     }
 
-    if (!ins->host.name) {
-        flb_plg_error(ctx->ins, "Host is required");
-        flb_oci_logan_conf_destroy(ctx);
-        return NULL;
+    if (ins->host.name) {
+        host = ins->host.name;
+    }
+    else {
+        if (!ctx->region) {
+            flb_errno();
+            flb_plg_error(ctx->ins, "Region is required");
+            flb_oci_logan_conf_destroy(ctx);
+            return NULL;
+        }
+        host = flb_sds_create_size(512);
+        flb_sds_snprintf(&host, flb_sds_alloc(host), "loganalytics.%s.oci.oraclecloud.com", ctx->region);
+    }
+
+    if (!ctx->uri) {
+        if (!ctx->namespace) {
+            flb_errno();
+            flb_plg_error(ctx->ins, "Namespace is required");
+            flb_oci_logan_conf_destroy(ctx);
+            return NULL;
+        }
+        ctx->uri = flb_sds_create_size(512);
+        flb_sds_snprintf(&ctx->uri, flb_sds_alloc(ctx->uri),
+                       "/20200601/namespaces/%s/actions/uploadLogEventsFile",
+                       ctx->namespace);
     }
 
 
@@ -291,12 +324,11 @@ struct flb_oci_logan *flb_oci_logan_conf_create(struct flb_output_instance *ins,
         return NULL;
     }
 
+
     ctx->key_id = flb_sds_create_size(512);
-    ctx->key_id = flb_sds_cat(ctx->key_id, ctx->tenancy, flb_sds_len(ctx->tenancy));
-    ctx->key_id = flb_sds_cat(ctx->key_id, "/", 1);
-    ctx->key_id = flb_sds_cat(ctx->key_id, ctx->user, flb_sds_len(ctx->user));
-    ctx->key_id = flb_sds_cat(ctx->key_id, "/", 1);
-    ctx->key_id = flb_sds_cat(ctx->key_id, ctx->key_fingerprint, flb_sds_len(ctx->key_fingerprint));
+    flb_sds_snprintf(&ctx->key_id, flb_sds_alloc(ctx->key_id),
+                     "%s/%s/%s", ctx->tenancy, ctx->user, ctx->key_fingerprint);
+
 
     /* Check if SSL/TLS is enabled */
     io_flags = FLB_IO_TCP;
@@ -313,17 +345,33 @@ struct flb_oci_logan *flb_oci_logan_conf_create(struct flb_output_instance *ins,
         io_flags |= FLB_IO_IPV6;
     }
 
-    if (!ins->host.name) {
-        flb_plg_error(ctx->ins, "Host is required");
-        flb_oci_logan_conf_destroy(ctx);
-        return NULL;
+    flb_output_net_default(host, default_port, ins);
+
+    if (ctx->proxy) {
+        ret = flb_utils_url_split(tmp, &protocol, &p_host, &p_port, &p_uri);
+        if (ret == -1) {
+            flb_plg_error(ctx->ins, "could not parse proxy parameter: '%s'", tmp);
+            flb_oci_logan_conf_destroy(ctx);
+            return NULL;
+        }
+
+        ctx->proxy_host = p_host;
+        ctx->proxy_port = atoi(p_port);
+        flb_free(protocol);
+        flb_free(p_port);
+        flb_free(p_uri);
+        flb_free(p_host);
     }
 
-    flb_output_net_default(ins->host.name, default_port, ins);
-
-    /* Prepare an upstream handler */
-    upstream = flb_upstream_create(config, ins->host.name, ins->host.port,
-                                   io_flags, ins->tls);
+    if (ctx->proxy) {
+        upstream = flb_upstream_create(config, ctx->proxy_host, ctx->proxy_port,
+                                       io_flags, ins->tls);
+    }
+    else {
+        /* Prepare an upstream handler */
+        upstream = flb_upstream_create(config, ins->host.name, ins->host.port,
+                                       io_flags, ins->tls);
+    }
 
     if (!upstream) {
         flb_plg_error(ctx->ins, "cannot create Upstream context");
@@ -334,8 +382,6 @@ struct flb_oci_logan *flb_oci_logan_conf_create(struct flb_output_instance *ins,
 
     /* Set instance flags into upstream */
     flb_output_upstream_set(ctx->u, ins);
-
-
 
     return ctx;
 }
@@ -369,18 +415,6 @@ int flb_oci_logan_conf_destroy(struct flb_oci_logan *ctx) {
     if(ctx->config_file_location) {
         flb_sds_destroy(ctx->config_file_location);
     }
-    if(ctx->plugin_log_file_count) {
-        flb_free(ctx->plugin_log_file_count);
-    }
-    if(ctx->plugin_log_file_size) {
-        flb_free(ctx->plugin_log_file_size);
-    }
-    if(ctx->plugin_log_location) {
-        flb_sds_destroy(ctx->plugin_log_location);
-    }
-    if(ctx->plugin_log_level) {
-        flb_free(ctx->plugin_log_level);
-    }
     if (ctx->private_key) {
         flb_sds_destroy(ctx->private_key);
     }
@@ -401,6 +435,9 @@ int flb_oci_logan_conf_destroy(struct flb_oci_logan *ctx) {
     }
     if(ctx->tenancy) {
         flb_sds_destroy(ctx->tenancy);
+    }
+    if(ctx->region) {
+        flb_sds_destroy(ctx->region);
     }
 
     flb_free(ctx);

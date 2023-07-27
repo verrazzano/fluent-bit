@@ -624,7 +624,7 @@ static int flush_to_endpoint(struct flb_oci_logan *ctx,
     }
     /* Create HTTP client context */
     c = flb_http_client(u_conn, FLB_HTTP_POST, full_uri, (void*) payload,
-                        flb_sds_len(payload), ctx->ins->host.name, ctx->ins->host.port, NULL, 0);
+                        flb_sds_len(payload), ctx->ins->host.name, ctx->ins->host.port, ctx->proxy, 0);
     if (!c) {
         goto error_label;
     }
@@ -1188,7 +1188,7 @@ static struct flb_config_map config_map[] = {
         "If true, mapping types is removed. (for v7.0.0 or later)"
     },
     {
-        FLB_CONFIG_MAP_STR, "uri", "",
+        FLB_CONFIG_MAP_STR, "uri", NULL,
         0, FLB_TRUE, offsetof(struct flb_oci_logan, uri),
         "If true, mapping types is removed. (for v7.0.0 or later)"
     },
@@ -1236,6 +1236,16 @@ static struct flb_config_map config_map[] = {
         FLB_CONFIG_MAP_SLIST_2, "oci_la_metadata", NULL,
         0, FLB_TRUE, offsetof(struct flb_oci_logan, oci_la_metadata),
         ""
+    },
+    {
+        FLB_CONFIG_MAP_STR, "namespace", NULL,
+        0, FLB_TRUE, offsetof(struct flb_oci_logan, namespace),
+            ""
+    },
+    {
+        FLB_CONFIG_MAP_STR, "proxy", NULL,
+        0, FLB_TRUE, offsetof(struct flb_oci_logan, proxy),
+            ""
     },
 
     {0}

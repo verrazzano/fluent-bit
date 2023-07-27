@@ -105,6 +105,7 @@
 #define FLB_OCI_PARAM_USER        "user"
 #define FLB_OCI_PARAM_KEY_FINGERPRINT     "fingerprint"
 #define FLB_OCI_PARAM_KEY_FILE     "key_file"
+#define FLB_OCI_PARAM_REGION  "region"
 #define FLB_OCI_PARAM_KEY_FILE_PASSPHRASE "key_file_passphrase"
 
 #define FLB_OCI_SIGN_SIGNATURE_VERSION   "Signature version=\"1\""
@@ -147,18 +148,6 @@
 #include <fluent-bit/flb_hash_table.h>
 #include <monkey/mk_core/mk_list.h>
 
-struct flb_oci_log_schema{
-    flb_sds_t log_group_id;
-    flb_sds_t log_set;
-    flb_sds_t entity_id;
-    flb_sds_t entity_type;
-    flb_sds_t log_source_name;
-    flb_sds_t log_path;
-    flb_sds_t global_metadata;
-    flb_sds_t metadata;
-    void *data;
-};
-
 struct metadata_obj {
     flb_sds_t key;
     flb_sds_t val;
@@ -181,14 +170,8 @@ struct flb_oci_logan {
 
     struct flb_upstream *u;
     flb_sds_t proxy;
-    char *proxy_ip;
-    int *proxy_port;
-    char *proxy_username;
-    char *proxy_password;
-    flb_sds_t plugin_log_location;
-    int *plugin_log_level;
-    void *plugin_log_file_size;
-    int *plugin_log_file_count;
+    char *proxy_host;
+    int proxy_port;
 
     // oci_la_* configs
     flb_sds_t oci_la_entity_id;
@@ -214,14 +197,11 @@ struct flb_oci_logan {
     flb_sds_t tenancy;
     flb_sds_t key_fingerprint;
     flb_sds_t key_file;
-    flb_sds_t passphrase;
     /* For OCI signing */
     flb_sds_t key_id; // tenancy/user/key_fingerprint
     flb_sds_t private_key;
 
     struct flb_output_instance *ins;
-
-    struct mk_list flb_oci_log_events;
 
 };
 #endif
