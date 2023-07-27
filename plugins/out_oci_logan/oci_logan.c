@@ -635,12 +635,12 @@ static int flush_to_endpoint(struct flb_oci_logan *ctx,
         goto error_label;
     }
     flb_plg_info(ctx->ins, "built request");
+    flb_plg_info(ctx->ins, "request header %s", c->header_buf);
 
     out_ret = FLB_OK;
 
     http_ret = flb_http_do(c, &b_sent);
     flb_plg_info(ctx->ins, "placed request");
-    flb_plg_info(ctx->ins, "request header %s", c->header_buf);
 
     if (http_ret == 0) {
 
@@ -671,11 +671,12 @@ static int flush_to_endpoint(struct flb_oci_logan *ctx,
         flb_plg_error(ctx->ins, "could not flush records to %s:%i (http_do=%i), retry=%s",
                       ctx->ins->host.name, ctx->ins->host.port,
                       http_ret, (out_ret == FLB_RETRY ? "true" : "false"));
+        goto error_label;
     }
 
 
 
-error_label:
+    error_label:
     if (full_uri) {
         flb_sds_destroy(full_uri);
     }
@@ -704,10 +705,10 @@ static void pack_oci_fields(msgpack_packer *packer,
 
 
     /* number of meta properties */
-    if(ctx->oci_la_global_metadata) {
+    if(ctx->oci_la_global_metadata != NULL) {
         num_global_meta = mk_list_size(&ctx->global_metadata_fields);
     }
-    if(ctx->oci_la_metadata) {
+    if(ctx->oci_la_metadata != NULL) {
         num_event_meta = mk_list_size(&ctx->log_event_metadata_fields);
     }
 
@@ -1014,11 +1015,13 @@ static int total_flush(struct flb_event_chunk *event_chunk,
     struct flb_http_client *c;
     flb_sds_t out_buf = NULL;
     size_t out_size;
-    int ret = -1, res = 0;
+    int ret = 0, res = 0, ret1 = 0;
     msgpack_object map;
     int map_size;
     msgpack_sbuffer mp_sbuf;
     msgpack_packer mp_pck;
+    msgpack_object tmp;
+    int msg = -1, log = -1;
     struct flb_log_event_decoder log_decoder;
     struct flb_log_event log_event;
     int num_records;
@@ -1040,30 +1043,23 @@ static int total_flush(struct flb_event_chunk *event_chunk,
     msgpack_packer_init(&mp_pck, &mp_sbuf, msgpack_sbuffer_write);
 
     // pack oci fields
-    pack_oci_fields(&mp_pck, ctx);
+    // pack_oci_fields(&mp_pck, ctx);
 
     num_records = flb_mp_count(event_chunk->data, event_chunk->size);
-
-    msgpack_pack_str(&mp_pck, FLB_OCI_LOG_RECORDS_SIZE);
-    msgpack_pack_str_body(&mp_pck, FLB_OCI_LOG_RECORDS,
-                          FLB_OCI_LOG_RECORDS_SIZE);
-    msgpack_pack_array(&mp_pck, num_records);
-
 
     while ((ret = flb_log_event_decoder_next(
         &log_decoder,
         &log_event)) == FLB_EVENT_DECODER_SUCCESS) {
         map      = *log_event.body;
         map_size = map.via.map.size;
-
         if (count < 1) {
             if (ctx->oci_config_in_record == FLB_FALSE) {
                 pack_oci_fields(&mp_pck, ctx);
                 log_group_id = ctx->oci_la_log_group_id;
                 log_set_id = ctx->oci_la_log_set_id;
             } else {
-                ret = get_and_pack_oci_fields_from_record(&mp_pck, map, &log_group_id, &log_set_id);
-                if (ret != 0) {
+                ret1 = get_and_pack_oci_fields_from_record(&mp_pck, map, &log_group_id, &log_set_id);
+                if (ret1 != 0) {
                     break;
                 }
             }
@@ -1074,22 +1070,48 @@ static int total_flush(struct flb_event_chunk *event_chunk,
             count++;
         }
 
-        msgpack_pack_map(&mp_pck, map_size);
+        // msgpack_pack_str(&mp_pck, map.via.map.ptr->val.via.str.size);
+        // msgpack_pack_str_body(&mp_pck, map.via.map.ptr->val.via.str.ptr, map.via.str.size);
+
+        msgpack_pack_str(&mp_pck, map.via.map.ptr[0].val.via.str.size);
+        msgpack_pack_str_body(&mp_pck, map.via.map.ptr[0].val.via.str.ptr, map.via.map.ptr[0].val.via.str.size);
+
 
         for(int i = 0; i < map_size; i++) {
-            msgpack_pack_object(&mp_pck, map.via.map.ptr[i].key);
-            msgpack_pack_object(&mp_pck, map.via.map.ptr[i].val);
+            if (check_config_from_record(map.via.map.ptr[i].key,
+                                         "message",
+                                         7) == FLB_TRUE) {
+                msg = i;
+            }
+            if (check_config_from_record(map.via.map.ptr[i].key,
+                                        "log",
+                                        3) == FLB_TRUE) {
+                log = i;
+            }
         }
+        if (log >= 0) {
+            msgpack_pack_object(&mp_pck, map.via.map.ptr[log].val);
+        }
+        else if (msg >= 0) {
+            msgpack_pack_object(&mp_pck, map.via.map.ptr[msg].val);
+        }
+        log = -1;
+        msg = -1;
     }
 
-    if (ret != 0) {
+    if (ret1 != 0) {
         res = -1;
+        msgpack_sbuffer_destroy(&mp_sbuf);
+        flb_log_event_decoder_destroy(&log_decoder);
         goto clean_up;
     }
 
-    out_buf = flb_msgpack_raw_to_json_sds(&mp_sbuf.data, mp_sbuf.size);
+    out_buf = flb_msgpack_raw_to_json_sds(mp_sbuf.data, mp_sbuf.size);
     msgpack_sbuffer_destroy(&mp_sbuf);
     flb_log_event_decoder_destroy(&log_decoder);
+
+    flb_plg_info(ctx->ins, "payload=%s", out_buf);
+    flb_plg_info(ctx->ins, "lg_id=%s", log_group_id);
 
     ret = flush_to_endpoint(ctx, out_buf, log_group_id, log_set_id);
     if(ret != FLB_OK) {
@@ -1124,16 +1146,14 @@ static void cb_oci_logan_flush(struct flb_event_chunk *event_chunk,
     struct flb_oci_logan *ctx = out_context;
     int ret = -1;
 
-    if(!ctx->oci_config_in_record) {
-        ret = total_flush(event_chunk, out_flush,
-                          ins, out_context,
-                          config);
-        if (ret != 0) {
-            flb_oci_logan_conf_destroy(ctx);
-            FLB_OUTPUT_RETURN(FLB_RETRY);
-        }
-        flb_plg_info(ctx->ins, "success");
+    ret = total_flush(event_chunk, out_flush,
+                      ins, out_context,
+                      config);
+    if (ret != 0) {
+        flb_oci_logan_conf_destroy(ctx);
+        FLB_OUTPUT_RETURN(FLB_RETRY);
     }
+    flb_plg_info(ctx->ins, "success");
 
     FLB_OUTPUT_RETURN(FLB_OK);
 
@@ -1239,5 +1259,5 @@ struct flb_output_plugin out_oci_logan_plugin = {
 
     /* Plugin flags */
     .flags          = FLB_OUTPUT_NET | FLB_IO_OPT_TLS,
-    .workers = 4,
+    .workers = 1,
 };
