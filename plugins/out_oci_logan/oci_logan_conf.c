@@ -280,7 +280,12 @@ struct flb_oci_logan *flb_oci_logan_conf_create(struct flb_output_instance *ins,
         }
     }
 
-
+    if (!ctx->config_file_location) {
+        flb_errno();
+        flb_plg_error(ctx->ins, "config file location is required");
+        flb_oci_logan_conf_destroy(ctx);
+        return NULL;
+    }
 
     ret = load_oci_credentials(ctx);
     if(ret != 0) {

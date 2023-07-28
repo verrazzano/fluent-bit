@@ -1175,57 +1175,57 @@ static struct flb_config_map config_map[] = {
     {
         FLB_CONFIG_MAP_STR, "config_file_location", "",
         0, FLB_TRUE, offsetof(struct flb_oci_logan, config_file_location),
-        "Set an index name"
+        "Location of the oci config file for user api key signing"
     },
     {
         FLB_CONFIG_MAP_STR, "profile_name", "DEFAULT",
         0, FLB_TRUE, offsetof(struct flb_oci_logan, profile_name),
-        "Set the document type property"
+        "name of the profile in the config file from which the user configs should be loaded"
     },
     {
         FLB_CONFIG_MAP_BOOL, "oci_config_in_record", "false",
         0, FLB_TRUE, offsetof(struct flb_oci_logan, oci_config_in_record),
-        "If true, mapping types is removed. (for v7.0.0 or later)"
+        "If true, oci_la_* configs will be read from the record"
     },
     {
         FLB_CONFIG_MAP_STR, "uri", NULL,
         0, FLB_TRUE, offsetof(struct flb_oci_logan, uri),
-        "If true, mapping types is removed. (for v7.0.0 or later)"
+        "Set the uri for rest api request"
     },
     {
         FLB_CONFIG_MAP_STR, "oci_la_log_group_id", NULL,
         0, FLB_TRUE, offsetof(struct flb_oci_logan, oci_la_log_group_id),
-        "If true, mapping types is removed. (for v7.0.0 or later)"
+        "log group id"
     },
     {
         FLB_CONFIG_MAP_STR, "oci_la_log_set_id", NULL,
         0, FLB_TRUE, offsetof(struct flb_oci_logan, oci_la_log_set_id),
-        "If true, mapping types is removed. (for v7.0.0 or later)"
+        ""
     },
     {
         FLB_CONFIG_MAP_STR, "oci_la_entity_id", NULL,
         0, FLB_TRUE, offsetof(struct flb_oci_logan, oci_la_entity_id),
-        "If true, mapping types is removed. (for v7.0.0 or later)"
+        ""
     },
     {
         FLB_CONFIG_MAP_STR, "oci_la_entity_type", NULL,
         0, FLB_TRUE, offsetof(struct flb_oci_logan, oci_la_entity_type),
-        "If true, mapping types is removed. (for v7.0.0 or later)"
+        ""
     },
     {
         FLB_CONFIG_MAP_STR, "oci_la_log_source_name", NULL,
         0, FLB_TRUE, offsetof(struct flb_oci_logan, oci_la_log_source_name),
-        "If true, mapping types is removed. (for v7.0.0 or later)"
+        ""
     },
     {
         FLB_CONFIG_MAP_STR, "oci_la_log_set_id", NULL,
         0, FLB_TRUE, offsetof(struct flb_oci_logan, oci_la_log_set_id),
-        "If true, mapping types is removed. (for v7.0.0 or later)"
+        ""
     },
     {
         FLB_CONFIG_MAP_STR, "oci_la_log_path", NULL,
         0, FLB_TRUE, offsetof(struct flb_oci_logan, oci_la_log_path),
-        "If true, mapping types is removed. (for v7.0.0 or later)"
+        ""
     },
     {
         FLB_CONFIG_MAP_SLIST_2, "oci_la_global_metadata", NULL,
@@ -1240,12 +1240,12 @@ static struct flb_config_map config_map[] = {
     {
         FLB_CONFIG_MAP_STR, "namespace", NULL,
         0, FLB_TRUE, offsetof(struct flb_oci_logan, namespace),
-            ""
+            "namespace in your tenancy where the log objects reside"
     },
     {
         FLB_CONFIG_MAP_STR, "proxy", NULL,
         0, FLB_TRUE, offsetof(struct flb_oci_logan, proxy),
-            ""
+            "define proxy if required, in http://host:port format, supports only http protocol"
     },
 
     {0}
