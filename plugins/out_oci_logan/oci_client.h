@@ -7,6 +7,13 @@
 
 #endif //FLUENT_BIT_PLUGINS_OUT_OCI_LOGAN_OCI_CLIENT_H_
 
-struct ip_request_signer {
-    // key provider, generic headers, body headers, should hash body
+#include <fluent-bit/flb_sds.h>
+
+struct request_signer {
+    flb_sds_t user_id;
+    flb_sds_t tenancy_id;
+    flb_sds_t region;
+    flb_sds_t private_key;
+    flb_sds_t key_id;
+    flb_sds_t
 };
