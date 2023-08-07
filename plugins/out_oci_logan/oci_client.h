@@ -14,6 +14,11 @@ struct request_signer {
     flb_sds_t tenancy_id;
     flb_sds_t region;
     flb_sds_t private_key;
+    flb_sds_t key_fingerprint;
     flb_sds_t key_id;
-    flb_sds_t
+    flb_sds_t auth_type;
 };
+
+struct request_signer *build_instance_principal_signer();
+struct request_signer *build_user_principal_signer();
+struct request_signer *build_workload_identity_signer();
