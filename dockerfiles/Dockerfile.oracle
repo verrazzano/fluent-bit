@@ -1,6 +1,6 @@
 FROM ghcr.io/verrazzano/verrazzano-base-ol9:v1.0.0-20230627070315-744eefa as builder-base
 
-RUN mkdir -p /fluent-bit/bin /fluent-bit/etc /fluent-bit/log
+RUN mkdir -p /fluent-bit/bin /fluent-bit/log /fluent-bit/rpm
 
 RUN microdnf -y module enable postgresql:15 \
     && microdnf --enablerepo=ol9_codeready_builder install -y \
@@ -20,12 +20,13 @@ RUN microdnf -y module enable postgresql:15 \
     bison \
     libyaml-devel \
     postgresql postgresql-server \
+    cpio \
     && microdnf clean all
 
 WORKDIR /src/fluent-bit/
 COPY . ./
 
-FROM builder-base
+FROM builder-base as fluentbit-builder
 WORKDIR /src/fluent-bit/build/
 RUN cmake -DFLB_RELEASE=On \
     -DFLB_JEMALLOC=On \
@@ -44,6 +45,19 @@ RUN cmake -DFLB_RELEASE=On \
 RUN make -j "$(getconf _NPROCESSORS_ONLN)"
 RUN install bin/fluent-bit /fluent-bit/bin/
 
+# Download all required RPM package locally then extract them into a directory.
+RUN microdnf --enablerepo=ol9_codeready_builder download --resolve --nodocs -y \
+    systemd-devel \
+    libpq-devel && \
+    microdnf clean all && \
+    for rpm in *.rpm; do \
+    echo "Processing: ${rpm}"; \
+    rpm2cpio ${rpm} | cpio -idmv -D /fluent-bit/rpm/; \
+    done
+
+FROM ghcr.io/verrazzano/verrazzano-base-ol9:v1.0.0-20230627070315-744eefa
+WORKDIR /fluent-bit
+
 COPY conf/fluent-bit.conf \
     conf/parsers.conf \
     conf/parsers_ambassador.conf \
@@ -54,8 +68,12 @@ COPY conf/fluent-bit.conf \
     conf/plugins.conf \
     /fluent-bit/etc/
 
-# Generate schema and include as part of the container image
-RUN /fluent-bit/bin/fluent-bit -J > /fluent-bit/etc/schema.json
+# Copy Fluent-bit binary
+COPY --from=fluentbit-builder /fluent-bit/bin/ /fluent-bit/bin/
+
+# Copy Dependencies
+COPY --from=fluentbit-builder /fluent-bit/rpm/usr/lib /usr/lib
+COPY --from=fluentbit-builder /fluent-bit/rpm/usr/lib64 /usr/lib64
 
 RUN mkdir -p /license
 COPY LICENSE README.md THIRD_PARTY_LICENSES.txt /license/
