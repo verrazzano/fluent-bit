@@ -45,9 +45,12 @@ RUN cmake -DFLB_RELEASE=On \
 RUN make -j "$(getconf _NPROCESSORS_ONLN)"
 RUN install bin/fluent-bit /fluent-bit/bin/
 
-# Download all required RPM package locally then extract them into a directory.
-RUN microdnf --enablerepo=ol9_codeready_builder download --resolve --nodocs -y \
+# Download required RPM package locally then extract them into a directory.
+RUN microdnf --enablerepo=ol9_codeready_builder download --nodocs -y \
     systemd-devel \
+    systemd-libs \
+    openldap-compat \
+    libpq \
     libpq-devel && \
     microdnf clean all && \
     for rpm in *.rpm; do \
