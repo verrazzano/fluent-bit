@@ -147,6 +147,7 @@
 #include <fluent-bit/flb_record_accessor.h>
 #include <fluent-bit/flb_hash_table.h>
 #include <monkey/mk_core/mk_list.h>
+#include "oci_client.h"
 
 struct metadata_obj {
     flb_sds_t key;
@@ -200,6 +201,8 @@ struct flb_oci_logan {
     /* For OCI signing */
     flb_sds_t key_id; // tenancy/user/key_fingerprint
     flb_sds_t private_key;
+
+    struct federation_client *fed_client;
 
     struct flb_output_instance *ins;
 
