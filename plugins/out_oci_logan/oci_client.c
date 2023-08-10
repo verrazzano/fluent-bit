@@ -2,52 +2,16 @@
 // Created by Aditya Bharadwaj on 23/07/23.
 //
 
-#include "oci_logan.h"
 #include "oci_client.h"
-#include "oci_logan_conf.h"
+
+#include <fluent-bit/flb_output.h>
+#include <fluent-bit/flb_config.h>
 
 #include <fluent-bit/flb_crypto.h>
-#include <fluent-bit/flb_hash.h>
 #include <openssl/rsa.h>
 #include <openssl/sha.h>
 #include <openssl/pem.h>
-
-// get region from region url, tenancy id from leaf certificate
-// from the federation endpoint fetch or refresh security token
-struct request_signer *build_instance_principal_signer() {
-    struct request_signer *rs;
-    rs = flb_calloc(1, sizeof(struct request_signer));
-    if (!rs) {
-        return NULL;
-    }
-
-    // retrieve leaf certificate
-
-    // retrieve intermediate certificate
-
-    // get tenancy id from leaf cert
-
-    // get region from region endpoint
-
-    // get security token using a federation client
-
-
-    return rs;
-}
-
-struct cert_retriever *url_based_cert_retriever(flb_sds_t cert_url,
-                                                flb_sds_t cert_key_url,
-                                                struct flb_upstream *u)
-{
-    struct cert_retriever *cr;
-    cr = flb_calloc(1, sizeof(struct cert_retriever));
-    if (!cr) {
-        return NULL;
-    }
-
-    return cr;
-
-}
+#include <jsmn/jsmn.h>
 
 flb_sds_t refresh_cert(struct flb_upstream *u,
                        flb_sds_t cert_url)
@@ -62,6 +26,8 @@ flb_sds_t refresh_cert(struct flb_upstream *u,
         flb_errno();
         return NULL;
     }
+
+    // TODO: construct cert url
 
     c = flb_http_client(u_conn, FLB_HTTP_GET, cert_url, NULL, 0,
                         NULL, 0, NULL, 0);
@@ -115,6 +81,8 @@ flb_sds_t refresh_cert_key(struct flb_upstream *u,
         return NULL;
     }
 
+    // construct cert key url
+
     c = flb_http_client(u_conn, FLB_HTTP_GET, cert_key_url, NULL, 0,
                         NULL, 0, NULL, 0);
 
@@ -139,7 +107,7 @@ flb_sds_t refresh_cert_key(struct flb_upstream *u,
         return NULL;
     }
 
-    priv_key = flb_sds_create_len(c->resp.payload, c->resp.payload_size);
+    priv_key = flb_sds_create_len(c->resp.payload, (int) c->resp.payload_size);
 
     if (!priv_key) {
         flb_errno();
@@ -236,10 +204,156 @@ flb_sds_t fingerprint(X509 *cert)
 
     colon_separated_fingerprint(md, (void *) buf, (size_t) SHA_DIGEST_LENGTH);
 
-    fingerprint = flb_sds_create_len(buf, 3*SHA_DIGEST_LENGTH - 1);
-
+    fingerprint = flb_sds_create_len(buf, 3*SHA_DIGEST_LENGTH);
     return fingerprint;
 }
 
+int session_key_supplier(flb_sds_t *priv_key,
+                         flb_sds_t *pub_key)
+{
+    // Key generation
+    EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_RSA, NULL);
+    EVP_PKEY* key = NULL;
+    BIO *pri, *pub;
+    int priKeyLen;
+    int pubKeyLen;
+    char* priKeyStr;
+    char* pubKeyStr;
+    EVP_PKEY_keygen_init(ctx);
+    EVP_PKEY_CTX_set_rsa_keygen_bits(ctx, RSA_KEYLEN);
+    EVP_PKEY_keygen(ctx, &key);
+    EVP_PKEY_CTX_free(ctx);
+
+    // Serialize to string
+    pri = BIO_new(BIO_s_mem());
+    pub = BIO_new(BIO_s_mem());
+    PEM_write_bio_PrivateKey(pri, key, NULL, NULL, 0, 0, NULL);
+    PEM_write_bio_PUBKEY(pub, key);
+
+    priKeyLen = BIO_pending(pri);
+    pubKeyLen = BIO_pending(pub);
+    priKeyStr = flb_malloc(priKeyLen + 1);
+    pubKeyStr = flb_malloc(pubKeyLen + 1);
+    BIO_read(pri, priKeyStr, priKeyLen);
+    BIO_read(pub, pubKeyStr, pubKeyLen);
+    priKeyStr[priKeyLen] = '\0';
+    pubKeyStr[pubKeyLen] = '\0';
+
+    *priv_key = flb_sds_create_len((const char *) priKeyStr, priKeyLen);
+    *pub_key = flb_sds_create_len((const char *)pubKeyStr, pubKeyLen);
+
+    return 0;
+}
 
 
+flb_sds_t get_region(struct flb_upstream *u)
+{
+    flb_sds_t security_token;
+    struct flb_connection *u_conn;
+    char* url;
+    struct flb_http_client *c;
+    size_t b_sent;
+    int ret;
+
+    // TODO: construct region uri
+    u_conn = flb_upstream_conn_get(u);
+    if (!u_conn) {
+        flb_errno();
+        return NULL;
+    }
+
+    c = flb_http_client(u_conn, FLB_HTTP_GET, url,
+                        NULL, 0, NULL, 0, NULL, 0);
+    if (!c) {
+        flb_errno();
+        return NULL;
+    }
+
+    flb_http_add_header(c, "Authorization", 13, "Bearer Oracle", 13);
+
+    ret = flb_http_do(c, &b_sent);
+
+    if (ret != 0) {
+        return NULL;
+    }
+
+    if (c->resp.status != 200 && c->resp.status != 201 &&
+        c->resp.status != 204) {
+        return NULL;
+    }
+
+    security_token = flb_sds_create_len(mk_string_tolower(c->resp.payload),
+                                        (int) c->resp.payload_size);
+
+    return security_token;
+}
+
+flb_sds_t parse_token(char *response,
+                      size_t response_len)
+{
+    int tok_size = 32, ret, i;
+    jsmn_parser parser;
+    jsmntok_t *t;
+    jsmntok_t *tokens;
+    char *key;
+    char *val;
+    int key_len;
+    int val_len;
+    flb_sds_t token = NULL;
+
+    jsmn_init(&parser);
+
+    tokens = flb_calloc(1, sizeof(jsmntok_t) * tok_size);
+    if (!tokens) {
+        flb_errno();
+        return NULL;
+    }
+
+    ret = jsmn_parse(&parser, response, response_len, tokens, tok_size);
+
+    if (ret<=0) {
+        flb_free(tokens);
+        return NULL;
+    }
+    tok_size = ret;
+
+    /* Parse JSON tokens */
+    for (i = 0; i < tok_size; i++) {
+        t = &tokens[i];
+
+        if (t->start == -1 || t->end == -1 || (t->start == 0 && t->end == 0)) {
+            break;
+        }
+
+        if (t->type != JSMN_STRING) {
+            continue;
+        }
+
+        key = response + t->start;
+        key_len = (t->end - t->start);
+
+        i++;
+        t = &tokens[i];
+        val = response + t->start;
+        val_len = (t->end - t->start);
+
+        if (val_len < 1) {
+            continue;
+        }
+
+        if ((key_len == sizeof(FLB_OCI_TOKEN) - 1)
+            && strncasecmp(key, FLB_OCI_TOKEN,
+                           sizeof(FLB_OCI_TOKEN) - 1) == 0) {
+            // code
+            token = flb_sds_create_len(val, val_len);
+            if (!token) {
+                flb_free(tokens);
+                return NULL;
+            }
+            break;
+        }
+    }
+
+    flb_free(tokens);
+    return token;
+}
