@@ -13,8 +13,143 @@
 #include <openssl/pem.h>
 #include <jsmn/jsmn.h>
 
-flb_sds_t refresh_cert(struct flb_upstream *u,
-                       flb_sds_t cert_url)
+flb_sds_t create_base64_sha256_signature(flb_sds_t private_key,
+                                                flb_sds_t signing_string)
+{
+    int len = 0, ret;
+    size_t outlen;
+    flb_sds_t signature;
+    unsigned char sha256_buf[32] = { 0 };
+    unsigned char sig[256] = { 0 };
+    size_t sig_len = sizeof(sig);
+
+    ret = flb_hash_simple(FLB_HASH_SHA256,
+                          (unsigned char*) signing_string,
+                          flb_sds_len(signing_string),
+                          sha256_buf, sizeof(sha256_buf));
+
+    if(ret != FLB_CRYPTO_SUCCESS) {
+        // flb_plg_error(ctx->ins, "error generating hash buffer");
+        return NULL;
+    }
+
+    ret =   flb_crypto_sign_simple(FLB_CRYPTO_PRIVATE_KEY,
+                                   FLB_CRYPTO_PADDING_PKCS1,
+                                   FLB_HASH_SHA256,
+                                   (unsigned char *) private_key,
+                                   flb_sds_len(private_key),
+                                   sha256_buf, sizeof(sha256_buf),
+                                   sig, &sig_len);
+
+
+    if (ret != FLB_CRYPTO_SUCCESS) {
+        // flb_plg_error(ctx->ins, "error signing SHA256");
+        return NULL;
+    }
+
+    signature = flb_sds_create_size(512);
+    if (!signature) {
+        flb_errno();
+        return NULL;
+    }
+
+    /* base 64 encode */
+    len = flb_sds_alloc(signature) - 1;
+    flb_base64_encode((unsigned char*) signature, len, &outlen, sig,
+                      sizeof(sig));
+    signature[outlen] = '\0';
+    flb_sds_len_set(signature, outlen);
+
+    return signature;
+}
+
+flb_sds_t get_date(void)
+{
+
+    flb_sds_t rfc1123date;
+    time_t t;
+    size_t size;
+    struct tm tm = { 0 };
+
+    /* Format Date */
+    rfc1123date = flb_sds_create_size(32);
+    if (!rfc1123date) {
+        flb_errno();
+        return NULL;
+    }
+
+    t = time(NULL);
+    if (!gmtime_r(&t, &tm)) {
+        flb_errno();
+        flb_sds_destroy(rfc1123date);
+        return NULL;
+    }
+    size = strftime(rfc1123date, flb_sds_alloc(rfc1123date) - 1,
+                    "%a, %d %b %Y %H:%M:%S GMT", &tm);
+    if (size <= 0) {
+        flb_errno();
+        flb_sds_destroy(rfc1123date);
+        return NULL;
+    }
+    flb_sds_len_set(rfc1123date, size);
+    return rfc1123date;
+}
+
+flb_sds_t add_header_and_signing(struct flb_http_client *c,
+                                 flb_sds_t signing_str,
+                                 const char *header,
+                                 int headersize,
+                                 const char *val, int val_size)
+{
+    if (!signing_str) {
+        return NULL;
+    }
+
+    flb_http_add_header(c, header, headersize, val, val_size);
+
+    signing_str = flb_sds_cat(signing_str, "\n", 1);
+    signing_str = flb_sds_cat(signing_str, header, headersize);
+    signing_str = flb_sds_cat(signing_str, ": ", 2);
+    signing_str = flb_sds_cat(signing_str, val, val_size);
+
+    return signing_str;
+}
+
+/*
+ * Authorization: Signature version="1",keyId="<tenancy_ocid>/<user_ocid>/<key_fingerprint>",
+ * algorithm="rsa-sha256",headers="(request-target) date x-content-sha256 content-type content-length",
+ * signature="signature"
+ */
+flb_sds_t create_authorization_header_content(flb_sds_t signature,
+                                                     flb_sds_t key_id)
+{
+    flb_sds_t content;
+
+    content = flb_sds_create_size(512);
+    content = flb_sds_cat(content, FLB_OCI_SIGN_SIGNATURE_VERSION,
+                          sizeof(FLB_OCI_SIGN_SIGNATURE_VERSION) - 1);
+    content = flb_sds_cat(content, ",", 1);
+    content = flb_sds_cat(content, FLB_OCI_SIGN_KEYID,
+                          sizeof(FLB_OCI_SIGN_KEYID) - 1);
+    content = flb_sds_cat(content, "=\"", 2);
+    content = flb_sds_cat(content, key_id, flb_sds_len(key_id));
+    content = flb_sds_cat(content, "\",", 2);
+    content = flb_sds_cat(content, FLB_OCI_SIGN_ALGORITHM,
+                          sizeof(FLB_OCI_SIGN_ALGORITHM) - 1);
+    content = flb_sds_cat(content, ",", 1);
+    content = flb_sds_cat(content, FLB_OCI_SIGN_HEADERS,
+                          sizeof(FLB_OCI_SIGN_HEADERS) - 1);
+    content = flb_sds_cat(content, ",", 1);
+    content = flb_sds_cat(content, FLB_OCI_SIGN_SIGNATURE,
+                          sizeof(FLB_OCI_SIGN_SIGNATURE) - 1);
+    content = flb_sds_cat(content, "=\"", 2);
+    content = flb_sds_cat(content, signature, flb_sds_len(signature));
+    content = flb_sds_cat(content, "\"", 1);
+
+    return content;
+}
+
+flb_sds_t refresh_cert(struct flb_upstream *u)
 {
     flb_sds_t cert = NULL;
     struct flb_connection *u_conn;
@@ -245,6 +380,16 @@ int session_key_supplier(flb_sds_t *priv_key,
     return 0;
 }
 
+X509 *get_cert_from_string(flb_sds_t cert_pem)
+{
+    X509 *cert;
+    BIO* certBio = BIO_new(BIO_s_mem());
+    BIO_write(certBio, cert_pem, (int) flb_sds_len(cert_pem));
+    cert = PEM_read_bio_X509(certBio, NULL, NULL, NULL);
+
+    BIO_free(certBio);
+    return cert;
+}
 
 flb_sds_t get_region(struct flb_upstream *u)
 {

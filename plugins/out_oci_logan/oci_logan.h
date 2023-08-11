@@ -92,13 +92,16 @@
 #define FLB_OCI_HEADER_USER_AGENT_VAL                  "Fluent-Bit"
 #define FLB_OCI_HEADER_CONTENT_TYPE                    "content-type"
 #define FLB_OCI_HEADER_CONTENT_TYPE_VAL                "application/octet-stream"
+#define FLB_OCI_HEADER_CONTENT_TYPE_FED_VAL            "application/json"
 #define FLB_OCI_HEADER_X_CONTENT_SHA256                "x-content-sha256"
 #define FLB_OCI_HEADER_CONTENT_LENGTH                  "content-length"
 #define FLB_OCI_HEADER_HOST                            "host"
 #define FLB_OCI_HEADER_DATE                            "date"
 #define FLB_OCI_HEADER_AUTH                            "Authorization"
 #define FLB_OCI_PAYLOAD_TYPE                           "payloadType"
-
+#define INSTANCE_PRINCIPAL                             "instance_principal"
+#define USER_PRINCIPAL                                 "user_principal"
+#define WORKLOAD_IDENTITY                              "workload_identity"
 
 /* For OCI signing */
 #define FLB_OCI_PARAM_TENANCY     "tenancy"
@@ -107,20 +110,6 @@
 #define FLB_OCI_PARAM_KEY_FILE     "key_file"
 #define FLB_OCI_PARAM_REGION  "region"
 #define FLB_OCI_PARAM_KEY_FILE_PASSPHRASE "key_file_passphrase"
-
-#define FLB_OCI_SIGN_SIGNATURE_VERSION   "Signature version=\"1\""
-#define FLB_OCI_SIGN_KEYID   "keyId"
-#define FLB_OCI_SIGN_ALGORITHM   "algorithm=\"rsa-sha256\""
-
-#define FLB_OCI_SIGN_HEADERS     "headers=\"" \
-    FLB_OCI_HEADER_REQUEST_TARGET " " \
-    FLB_OCI_HEADER_HOST " " \
-    FLB_OCI_HEADER_DATE " " \
-    FLB_OCI_HEADER_X_CONTENT_SHA256 " " \
-    FLB_OCI_HEADER_CONTENT_TYPE " " \
-    FLB_OCI_HEADER_CONTENT_LENGTH "\""
-
-#define FLB_OCI_SIGN_SIGNATURE   "signature"
 
 /* For error response */
 #define FLB_OCI_ERROR_RESPONSE_CODE     "code"
@@ -133,6 +122,8 @@
 #define FLB_OCI_ERROR_CODE_NOT_AUTH_OR_RESOURCE_EXIST      "NotAuthorizedOrResourceAlreadyExists"
 #define FLB_OCI_ERROR_CODE_TOO_MANY_REQUESTS               "TooManyRequests"
 #define FLB_OCI_ERROR_CODE_INTERNAL_SERVER_ERROR           "InternalServerError"
+
+#define OCI_FEDERATION_REQUEST_PAYLOAD            "{\"certificate\":\"%s\",\"publicKey\":\"%s\", \"intermediateCertificates\":[\"%s\"]}"
 
 #define METADATA_URL_BASE  "http://169.254.169.254/opc/v2"
 #define GET_REGION_URL  "http://169.254.169.254/opc/v2/instance/region"
@@ -160,18 +151,20 @@ struct request_signer {
 
 struct federation_client {
   struct flb_upstream *u;
+  flb_sds_t region;
   flb_sds_t tenancy_id;
   struct cert_retriever *leaf_cert_ret;
   struct cert_retriever *intermediate_cert_ret;
   // session key supplier
+  flb_sds_t private_key;
+  flb_sds_t public_key;
+  flb_sds_t key_id;
   flb_sds_t security_token;
   pthread_mutex_t lock;
 };
 
 struct cert_retriever {
   struct flb_upstream *u;
-  flb_sds_t cert_url;
-  flb_sds_t priv_key_url;
   flb_sds_t cert_pem;
   X509 *cert;
   flb_sds_t private_key_pem;
@@ -196,12 +189,15 @@ struct flb_oci_logan {
     flb_sds_t profile_name;
     int oci_config_in_record;
     flb_sds_t uri;
+    flb_sds_t auth_type;
 
     struct flb_upstream *u;
     flb_sds_t proxy;
     char *proxy_host;
     int proxy_port;
 
+    struct flb_upstream *cert_u;
+    struct flb_upstream *fed_u;
     // oci_la_* configs
     flb_sds_t oci_la_entity_id;
 
@@ -231,6 +227,8 @@ struct flb_oci_logan {
     flb_sds_t private_key;
 
     struct federation_client *fed_client;
+
+    struct flb_hash_table region_table;
 
     struct flb_output_instance *ins;
 
