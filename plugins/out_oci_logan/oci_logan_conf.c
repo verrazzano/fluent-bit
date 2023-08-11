@@ -20,12 +20,17 @@
 #include "oci_logan.h"
 #include "oci_logan_conf.h"
 
-static int init_fed_client(struct flb_oci_logan *ctx,
+int refresh_security_token(struct flb_oci_logan *ctx,
                            struct flb_config *config)
 {
     flb_sds_t region;
     flb_sds_t host;
     struct flb_upstream *upstream;
+    struct flb_connection *u_conn;
+    struct flb_http_client *c;
+    int ret = -1;
+    size_t b_sent;
+    char *json = "";
     if (!ctx->fed_client) {
         ctx->fed_client = flb_calloc(1, sizeof(struct federation_client));
     }
@@ -36,11 +41,14 @@ static int init_fed_client(struct flb_oci_logan *ctx,
         ctx->fed_client->intermediate_cert_ret = flb_calloc(1, sizeof(struct cert_retriever));
     }
 
-    ctx->fed_client->leaf_cert_ret->cert_pem = refresh_cert(ctx->cert_u);
-    ctx->fed_client->leaf_cert_ret->private_key_pem = refresh_cert_key(ctx->cert_u);
+    ctx->fed_client->leaf_cert_ret->cert_pem = refresh_cert(ctx->cert_u,
+                                                            LEAF_CERTIFICATE_URL);
+    ctx->fed_client->leaf_cert_ret->private_key_pem = refresh_cert(ctx->cert_u,
+                                                                   LEAF_CERTIFICATE_PRIVATE_KEY_URL);
     ctx->fed_client->leaf_cert_ret->cert = get_cert_from_string(ctx->fed_client->leaf_cert_ret->cert_pem);
 
-    ctx->fed_client->intermediate_cert_ret->cert_pem = refresh_cert(ctx->cert_u);
+    ctx->fed_client->intermediate_cert_ret->cert_pem = refresh_cert(ctx->cert_u,
+                                                                    INTERMEDIATE_CERTIFICATE_URL);
 
     region = get_region(ctx->cert_u);
     ctx->fed_client->region = region;
@@ -52,10 +60,40 @@ static int init_fed_client(struct flb_oci_logan *ctx,
         return -1;
     }
 
-    ctx->fed_client->u = upstream;
+    ctx->fed_u = upstream;
     ctx->fed_client->tenancy_id = get_tenancy_id_from_certificate(ctx->fed_client->leaf_cert_ret->cert);
     session_key_supplier(&ctx->fed_client->private_key,
                          &ctx->fed_client->public_key);
+
+    // TODO: build headers
+
+    u_conn = flb_upstream_conn_get(ctx->fed_u);
+    if (!u_conn) {
+        return -1;
+    }
+
+    sprintf(json,OCI_FEDERATION_REQUEST_PAYLOAD,
+            ctx->fed_client->leaf_cert_ret->cert_pem,
+            ctx->fed_client->public_key,
+            ctx->fed_client->intermediate_cert_ret->cert_pem);
+
+    c = flb_http_client(u_conn, FLB_HTTP_POST, "v1/x509",
+                        json, strlen(json),
+                        NULL, 0, NULL, 0);
+
+    for (int i = 0; i < 5; i++) {
+        ret = flb_http_do(c, &b_sent);
+        if (ret != 0) {
+            continue;
+        }
+        if (c->resp.status != 200) {
+            continue;
+        }
+        ctx->fed_client->security_token = parse_token(c->resp.payload,
+                                                      c->resp.payload_size);
+        break;
+
+    }
     return 0;
 
 }
@@ -431,6 +469,7 @@ static int log_event_metadata_create(struct flb_oci_logan *ctx)
 
     return 0;
 }
+
 struct flb_oci_logan *flb_oci_logan_conf_create(struct flb_output_instance *ins,
                                                 struct flb_config *config) {
     struct flb_oci_logan *ctx;
@@ -459,10 +498,12 @@ struct flb_oci_logan *flb_oci_logan_conf_create(struct flb_output_instance *ins,
         return NULL;
     }
 
-    init_fed_client(ctx, config);
+    ctx->cert_u = flb_upstream_create(config, METADATA_HOST_BASE, 80, 0, NULL);
+    refresh_security_token(ctx, config);
     ctx->region = ctx->fed_client->region;
     ctx->private_key = ctx->fed_client->private_key;
-    ctx->key_id = NULL;
+
+    // TODO: fetch security token
 
 
     if (ctx->oci_la_global_metadata != NULL) {

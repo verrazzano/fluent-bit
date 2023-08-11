@@ -6,7 +6,7 @@
 #define FLUENT_BIT_OUT_OCI_LOGAN_OCI_CLIENT_H
 
 #define FLB_OCI_TOKEN "token"
-#define RSA_KEYLEN 2048
+#define RSA_EXP 65537
 
 #define FLB_OCI_HEADER_REQUEST_TARGET           "(request-target)"
 #define FLB_OCI_HEADER_USER_AGENT                      "User-Agent"
@@ -45,7 +45,7 @@
 #include <fluent-bit/flb_base64.h>
 #include <fluent-bit/flb_http_client.h>
 
-flb_sds_t refresh_cert(struct flb_upstream *u);
+flb_sds_t refresh_cert(struct flb_upstream *u, flb_sds_t cert_url);
 flb_sds_t refresh_cert_key(struct flb_upstream *u);
 flb_sds_t get_tenancy_id_from_certificate(X509 *cert);
 int sanitize_certificate_string(flb_sds_t *cert_pem);
@@ -67,9 +67,3 @@ static flb_sds_t create_base64_sha256_signature(flb_sds_t private_key,
                                                 flb_sds_t signing_string);
 flb_sds_t create_authorization_header_content(flb_sds_t signature,
                                               flb_sds_t key_id);
-
-
-
-struct request_signer *build_instance_principal_signer();
-struct request_signer *build_user_principal_signer();
-struct request_signer *build_workload_identity_signer();

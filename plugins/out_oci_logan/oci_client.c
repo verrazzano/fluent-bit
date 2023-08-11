@@ -149,7 +149,8 @@ flb_sds_t create_authorization_header_content(flb_sds_t signature,
     return content;
 }
 
-flb_sds_t refresh_cert(struct flb_upstream *u)
+flb_sds_t refresh_cert(struct flb_upstream *u,
+                       flb_sds_t cert_url)
 {
     flb_sds_t cert = NULL;
     struct flb_connection *u_conn;
@@ -161,8 +162,6 @@ flb_sds_t refresh_cert(struct flb_upstream *u)
         flb_errno();
         return NULL;
     }
-
-    // TODO: construct cert url
 
     c = flb_http_client(u_conn, FLB_HTTP_GET, cert_url, NULL, 0,
                         NULL, 0, NULL, 0);
@@ -354,8 +353,16 @@ int session_key_supplier(flb_sds_t *priv_key,
     int pubKeyLen;
     char* priKeyStr;
     char* pubKeyStr;
+    int ret;
+    BIGNUM *bne = NULL;
+
+    bne = BN_new();
+    ret = BN_set_word(bne, RSA_EXP);
+    if (ret != -1) {
+        return -1;
+    }
     EVP_PKEY_keygen_init(ctx);
-    EVP_PKEY_CTX_set_rsa_keygen_bits(ctx, RSA_KEYLEN);
+    EVP_PKEY_CTX_set1_rsa_keygen_pubexp(ctx, bne);
     EVP_PKEY_keygen(ctx, &key);
     EVP_PKEY_CTX_free(ctx);
 
@@ -393,7 +400,7 @@ X509 *get_cert_from_string(flb_sds_t cert_pem)
 
 flb_sds_t get_region(struct flb_upstream *u)
 {
-    flb_sds_t security_token;
+    flb_sds_t region;
     struct flb_connection *u_conn;
     char* url;
     struct flb_http_client *c;
@@ -427,10 +434,10 @@ flb_sds_t get_region(struct flb_upstream *u)
         return NULL;
     }
 
-    security_token = flb_sds_create_len(mk_string_tolower(c->resp.payload),
+    region = flb_sds_create_len(mk_string_tolower(c->resp.payload),
                                         (int) c->resp.payload_size);
 
-    return security_token;
+    return region;
 }
 
 flb_sds_t parse_token(char *response,
