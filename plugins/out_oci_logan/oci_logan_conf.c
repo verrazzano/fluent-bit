@@ -222,6 +222,10 @@ int refresh_security_token(struct flb_oci_logan *ctx,
     session_key_supplier(&ctx->fed_client->private_key,
                          &ctx->fed_client->public_key);
 
+    ctx->fed_client->key_id = flb_sds_create_size(512);
+    flb_sds_snprintf(&ctx->fed_client->key_id, flb_sds_alloc(ctx->fed_client->key_id),
+                     "%s/fed-x509/%s", ctx->fed_client->tenancy_id, fingerprint(ctx->fed_client->leaf_cert_ret->cert));
+
     // TODO: build headers
     u_conn = flb_upstream_conn_get(ctx->fed_u);
     if (!u_conn) {
@@ -229,9 +233,9 @@ int refresh_security_token(struct flb_oci_logan *ctx,
     }
 
     sprintf(json,OCI_FEDERATION_REQUEST_PAYLOAD,
-            ctx->fed_client->leaf_cert_ret->cert_pem,
-            ctx->fed_client->public_key,
-            ctx->fed_client->intermediate_cert_ret->cert_pem);
+            sanitize_certificate_string(ctx->fed_client->leaf_cert_ret->cert_pem),
+            sanitize_certificate_string(ctx->fed_client->public_key),
+            sanitize_certificate_string(ctx->fed_client->intermediate_cert_ret->cert_pem));
 
     c = flb_http_client(u_conn, FLB_HTTP_POST, "v1/x509",
                         json, strlen(json),
@@ -253,7 +257,7 @@ int refresh_security_token(struct flb_oci_logan *ctx,
         break;
 
     }
-     err = get_token_exp(ctx->fed_client->security_token, &ctx->fed_client->expire);
+    err = get_token_exp(ctx->fed_client->security_token, &ctx->fed_client->expire);
     if (err) {
         flb_plg_error(ctx->ins, "%s",err);
         flb_upstream_conn_release(u_conn);
@@ -509,7 +513,7 @@ struct flb_oci_logan *flb_oci_logan_conf_create(struct flb_output_instance *ins,
         return NULL;
     }
 
-    ctx->cert_u = flb_upstream_create(config, METADATA_HOST_BASE, 80, 0, NULL);
+    ctx->cert_u = flb_upstream_create(config, METADATA_HOST_BASE, 80, FLB_IO_TCP, NULL);
     refresh_security_token(ctx, config);
     ctx->region = ctx->fed_client->region;
     ctx->private_key = ctx->fed_client->private_key;

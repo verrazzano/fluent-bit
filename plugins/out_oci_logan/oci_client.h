@@ -48,7 +48,7 @@
 flb_sds_t refresh_cert(struct flb_upstream *u, flb_sds_t cert_url);
 flb_sds_t refresh_cert_key(struct flb_upstream *u);
 flb_sds_t get_tenancy_id_from_certificate(X509 *cert);
-int sanitize_certificate_string(flb_sds_t *cert_pem);
+flb_sds_t sanitize_certificate_string(flb_sds_t cert_pem);
 void colon_separated_fingerprint(unsigned char* readbuf, void *writebuf, size_t len);
 flb_sds_t fingerprint(X509 *cert);
 int session_key_supplier(flb_sds_t *priv_key,

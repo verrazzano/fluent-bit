@@ -281,34 +281,35 @@ flb_sds_t get_tenancy_id_from_certificate(X509 *cert)
     return t_id;
 }
 
-int sanitize_certificate_string(flb_sds_t *cert_pem)
+flb_sds_t sanitize_certificate_string(flb_sds_t cert_pem)
 {
     // i2d_X509()
+    flb_sds_t sanitized = cert_pem;
     char c_start[] = "-----BEGIN CERTIFICATE-----";
     char c_end[] = "-----END CERTIFICATE-----";
     char k_start[] = "-----BEGIN PUBLIC KEY-----";
     char k_end[] = "-----END PUBLIC KEY-----";
     char *start = NULL;
 
-    start = strstr(c_start, *cert_pem);
+    start = strstr(sanitized, c_start);
     strcpy(start, "");
 
-    start = strstr(c_end, *cert_pem);
+    start = strstr(sanitized, c_end);
     strcpy(start, "");
 
-    start = strstr(*cert_pem, k_start);
+    start = strstr(sanitized, k_start);
     strcpy(start, "");
 
-    start = strstr(*cert_pem, k_end);
+    start = strstr(sanitized, k_end);
     strcpy(start,"");
 
-    start = strstr(*cert_pem, "\n");
+    start = strstr(sanitized, "\n");
     while(start != NULL)
     {
         strcpy(start, "");
-        start = strstr(*cert_pem, "\n");
+        start = strstr(sanitized, "\n");
     }
-    return 0;
+    return sanitized;
 }
 
 void colon_separated_fingerprint(unsigned char* readbuf, void *writebuf, size_t len)
