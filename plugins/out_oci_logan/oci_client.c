@@ -201,61 +201,6 @@ flb_sds_t refresh_cert(struct flb_upstream *u,
     return cert;
 }
 
-flb_sds_t refresh_cert_key(struct flb_upstream *u,
-                           flb_sds_t cert_key_url)
-{
-    flb_sds_t priv_key = NULL;
-    struct flb_connection *u_conn;
-    struct flb_http_client *c;
-    int ret = 0;
-    size_t b_sent;
-    u_conn = flb_upstream_conn_get(u);
-    if (!u_conn) {
-        flb_errno();
-        return NULL;
-    }
-
-    // construct cert key url
-
-    c = flb_http_client(u_conn, FLB_HTTP_GET, cert_key_url, NULL, 0,
-                        NULL, 0, NULL, 0);
-
-    if (!c) {
-        flb_errno();
-        flb_upstream_conn_release(u_conn);
-        return NULL;
-    }
-    ret = flb_http_do(c, &b_sent);
-
-    if (!ret) {
-        flb_errno();
-        flb_upstream_conn_release(u_conn);
-        flb_http_client_destroy(c);
-        return NULL;
-    }
-
-    if (c->resp.status != 200 && c->resp.status != 204 && c->resp.status != 201) {
-        flb_errno();
-        flb_upstream_conn_release(u_conn);
-        flb_http_client_destroy(c);
-        return NULL;
-    }
-
-    priv_key = flb_sds_create_len(c->resp.payload, (int) c->resp.payload_size);
-
-    if (!priv_key) {
-        flb_errno();
-        flb_upstream_conn_release(u_conn);
-        flb_http_client_destroy(c);
-        return NULL;
-    }
-
-    flb_upstream_conn_release(u_conn);
-    flb_http_client_destroy(c);
-    return priv_key;
-
-}
-
 // finish this func
 flb_sds_t get_tenancy_id_from_certificate(X509 *cert)
 {
@@ -281,25 +226,51 @@ flb_sds_t get_tenancy_id_from_certificate(X509 *cert)
     return t_id;
 }
 
-flb_sds_t sanitize_certificate_string(flb_sds_t cert_pem)
+char* sanitize_certificate_string(flb_sds_t cert_pem)
 {
     // i2d_X509()
-    flb_sds_t sanitized = flb_sds_create_size(flb_sds_len(cert_pem));
+    char sanitized[flb_sds_len(cert_pem) + 1];
+    strcpy(sanitized, cert_pem);
     char c_start[] = "-----BEGIN CERTIFICATE-----";
+    size_t c_st_len = strlen(c_start);
     char c_end[] = "-----END CERTIFICATE-----";
+    size_t c_end_len = strlen(c_end);
     char k_start[] = "-----BEGIN PUBLIC KEY-----";
+    size_t k_st_len = strlen(k_start);
     char k_end[] = "-----END PUBLIC KEY-----";
-    char *start = strtok(cert_pem, "\n");
-    while(start != NULL) {
-        if (strcmp(start, c_start) != 0 &&
-            strcmp(start, c_end) != 0 &&
-            strcmp(start, k_start) != 0 &&
-            strcmp(start, k_end) != 0) {
-            flb_sds_cat_safe(&sanitized, start, strlen(start));
-        }
-        start = strtok(NULL, "\n");
+    size_t k_end_len = strlen(k_end);
+    char *p = NULL, *ans;
+
+    p = strstr(sanitized, c_start);
+    if (p) {
+        memcpy(p, "", 0);
+        memmove(p, p + c_st_len, strlen(p + c_st_len) + 1);
     }
-    return sanitized;
+    p = strstr(sanitized, c_end);
+    if (p) {
+        memcpy(p, "", 0);
+        memmove(p, p + c_end_len, strlen(p + c_end_len) + 1);
+    }
+    p = strstr(sanitized, k_start);
+    if (p) {
+        memcpy(p, "", 0);
+        memmove(p, p + k_st_len, strlen(p + k_st_len) + 1);
+    }
+    p = strstr(sanitized, k_end);
+    if (p) {
+        memcpy(p, "", 0);
+        memmove(p, p + k_end_len, strlen(p + k_end_len) + 1);
+    }
+    p = strtok(sanitized, "\n");
+    while(p != NULL)
+    {
+        if (strlen(p)) {
+            ans = p;
+        }
+        p = strtok(NULL, "\n");
+    }
+
+    return ans;
 }
 
 void colon_separated_fingerprint(unsigned char* readbuf, void *writebuf, size_t len)
