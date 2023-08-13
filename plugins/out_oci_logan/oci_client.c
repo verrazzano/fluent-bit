@@ -509,3 +509,155 @@ flb_sds_t parse_token(char *response,
     flb_free(tokens);
     return token;
 }
+
+static const char *jwt_decode_payload(const char *src,
+                                      char **bufplainp) {
+    char *converted_src;
+    char *payload = NULL;
+
+    const char *errstr = NULL;
+
+    int i, padding, len;
+
+    int payload_len;
+    int nbytesdecoded;
+
+    int payloads_start = 0;
+    int payloads_end   = 0;
+
+    len           = (int)strlen(src);
+    converted_src = flb_malloc(len + 4);
+
+    for (i = 0; i < len; i++) {
+        switch (src[i]) {
+            case '-':
+                converted_src[i] = '+';
+                break;
+
+            case '_':
+                converted_src[i] = '/';
+                break;
+
+            case '.':
+                if (payloads_start == 0)
+                    payloads_start = i + 1;
+                else {
+                    if (payloads_end > 0) {
+                        errstr =
+                            "The token is invalid with more "
+                            "than 2 delimiters";
+                        goto done;
+                    }
+                    payloads_end = i;
+                }
+                /* FALLTHRU */
+
+            default:
+                converted_src[i] = src[i];
+        }
+    }
+
+    if (payloads_start == 0 || payloads_end == 0) {
+        errstr = "The token is invalid with less than 2 delimiters";
+        goto done;
+    }
+
+    payload_len = payloads_end - payloads_start;
+    payload     = flb_malloc(payload_len + 4);
+    strncpy(payload, (converted_src + payloads_start), payload_len);
+
+    padding = 4 - (payload_len % 4);
+    if (padding < 4) {
+        while (padding--)
+            payload[payload_len++] = '=';
+    }
+
+    nbytesdecoded = ((payload_len + 3) / 4) * 3;
+    *bufplainp    = flb_malloc(nbytesdecoded + 1);
+
+    if (EVP_DecodeBlock((uint8_t *)(*bufplainp), (uint8_t *)payload,
+                        (int)payload_len) == -1) {
+        errstr = "Failed to decode base64 payload";
+    }
+
+    done:
+    flb_free(payload);
+    flb_free(converted_src);
+    return errstr;
+}
+
+const char* get_token_exp(flb_sds_t token_string,
+                          time_t *exp)
+{
+    char *payload = NULL;
+    const char* err_str = NULL;
+
+    err_str = jwt_decode_payload(token_string, &payload);
+
+    if (err_str != NULL) {
+        return err_str;
+    }
+
+    int tok_size = 32, ret, i;
+    jsmn_parser parser;
+    jsmntok_t *t;
+    jsmntok_t *tokens;
+    char *key;
+    char *val;
+    int key_len;
+    int val_len;
+    flb_sds_t token = NULL;
+
+    jsmn_init(&parser);
+
+    tokens = flb_calloc(1, sizeof(jsmntok_t) * tok_size);
+    if (!tokens) {
+        flb_errno();
+        return NULL;
+    }
+
+    ret = jsmn_parse(&parser, payload, strlen(payload), tokens, tok_size);
+
+    if (ret<=0) {
+        flb_free(tokens);
+        return NULL;
+    }
+    tok_size = ret;
+
+    /* Parse JSON tokens */
+    for (i = 0; i < tok_size; i++) {
+        t = &tokens[i];
+
+        if (t->start == -1 || t->end == -1 || (t->start == 0 && t->end == 0)) {
+            break;
+        }
+
+        if (t->type != JSMN_STRING) {
+            continue;
+        }
+
+        key = payload + t->start;
+        key_len = (t->end - t->start);
+
+        i++;
+        t = &tokens[i];
+        val = payload + t->start;
+        val_len = (t->end - t->start);
+
+        if (val_len < 1) {
+            continue;
+        }
+
+        if ((key_len == 3)
+            && strncasecmp(key, "exp",
+                           3) == 0) {
+            // code
+            *exp = atol(val);
+            break;
+        }
+    }
+
+    flb_free(tokens);
+    return err_str;
+}
+

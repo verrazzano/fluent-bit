@@ -20,89 +20,10 @@
 #include "oci_logan.h"
 #include "oci_logan_conf.h"
 
-int refresh_security_token(struct flb_oci_logan *ctx,
-                           struct flb_config *config)
-{
-    flb_sds_t region;
-    flb_sds_t host;
-    struct flb_upstream *upstream;
-    struct flb_connection *u_conn;
-    struct flb_http_client *c;
-    int ret = -1;
-    size_t b_sent;
-    char *json = "";
-    if (!ctx->fed_client) {
-        ctx->fed_client = flb_calloc(1, sizeof(struct federation_client));
-    }
-    if (!ctx->fed_client->leaf_cert_ret) {
-        ctx->fed_client->leaf_cert_ret = flb_calloc(1, sizeof(struct cert_retriever));
-    }
-    if (!ctx->fed_client->intermediate_cert_ret) {
-        ctx->fed_client->intermediate_cert_ret = flb_calloc(1, sizeof(struct cert_retriever));
-    }
-
-    ctx->fed_client->leaf_cert_ret->cert_pem = refresh_cert(ctx->cert_u,
-                                                            LEAF_CERTIFICATE_URL);
-    ctx->fed_client->leaf_cert_ret->private_key_pem = refresh_cert(ctx->cert_u,
-                                                                   LEAF_CERTIFICATE_PRIVATE_KEY_URL);
-    ctx->fed_client->leaf_cert_ret->cert = get_cert_from_string(ctx->fed_client->leaf_cert_ret->cert_pem);
-
-    ctx->fed_client->intermediate_cert_ret->cert_pem = refresh_cert(ctx->cert_u,
-                                                                    INTERMEDIATE_CERTIFICATE_URL);
-
-    region = get_region(ctx->cert_u);
-    ctx->fed_client->region = region;
-    host = flb_sds_create_size(512);
-    flb_sds_snprintf(&host, flb_sds_alloc(host), "auth.%s.oci.oraclecloud.com", region);
-    upstream = flb_upstream_create(config, host,  443,
-                                   FLB_IO_TLS, ctx->ins->tls);
-    if (!upstream) {
-        return -1;
-    }
-
-    ctx->fed_u = upstream;
-    ctx->fed_client->tenancy_id = get_tenancy_id_from_certificate(ctx->fed_client->leaf_cert_ret->cert);
-    session_key_supplier(&ctx->fed_client->private_key,
-                         &ctx->fed_client->public_key);
-
-    // TODO: build headers
-
-    u_conn = flb_upstream_conn_get(ctx->fed_u);
-    if (!u_conn) {
-        return -1;
-    }
-
-    sprintf(json,OCI_FEDERATION_REQUEST_PAYLOAD,
-            ctx->fed_client->leaf_cert_ret->cert_pem,
-            ctx->fed_client->public_key,
-            ctx->fed_client->intermediate_cert_ret->cert_pem);
-
-    c = flb_http_client(u_conn, FLB_HTTP_POST, "v1/x509",
-                        json, strlen(json),
-                        NULL, 0, NULL, 0);
-
-    for (int i = 0; i < 5; i++) {
-        ret = flb_http_do(c, &b_sent);
-        if (ret != 0) {
-            continue;
-        }
-        if (c->resp.status != 200) {
-            continue;
-        }
-        ctx->fed_client->security_token = parse_token(c->resp.payload,
-                                                      c->resp.payload_size);
-        break;
-
-    }
-    return 0;
-
-}
-
 static int build_federation_client_headers(struct flb_oci_logan *ctx,
                                            struct flb_http_client *c,
                                            flb_sds_t json,
-                                           flb_sds_t hostname,
-                                           int port, flb_sds_t uri)
+                                           flb_sds_t uri)
 {
     int ret = -1;
     flb_sds_t tmp_sds = NULL;
@@ -252,6 +173,96 @@ static int build_federation_client_headers(struct flb_oci_logan *ctx,
         flb_sds_destroy(auth_header_str);
     }
     return ret;
+
+}
+
+int refresh_security_token(struct flb_oci_logan *ctx,
+                           struct flb_config *config)
+{
+    flb_sds_t region;
+    flb_sds_t host;
+    char* err;
+    struct flb_upstream *upstream;
+    struct flb_connection *u_conn;
+    struct flb_http_client *c;
+    int ret = -1;
+    size_t b_sent;
+    char *json = "";
+    if (!ctx->fed_client) {
+        ctx->fed_client = flb_calloc(1, sizeof(struct federation_client));
+    }
+    if (!ctx->fed_client->leaf_cert_ret) {
+        ctx->fed_client->leaf_cert_ret = flb_calloc(1, sizeof(struct cert_retriever));
+    }
+    if (!ctx->fed_client->intermediate_cert_ret) {
+        ctx->fed_client->intermediate_cert_ret = flb_calloc(1, sizeof(struct cert_retriever));
+    }
+
+    ctx->fed_client->leaf_cert_ret->cert_pem = refresh_cert(ctx->cert_u,
+                                                            LEAF_CERTIFICATE_URL);
+    ctx->fed_client->leaf_cert_ret->private_key_pem = refresh_cert(ctx->cert_u,
+                                                                   LEAF_CERTIFICATE_PRIVATE_KEY_URL);
+    ctx->fed_client->leaf_cert_ret->cert = get_cert_from_string(ctx->fed_client->leaf_cert_ret->cert_pem);
+
+    ctx->fed_client->intermediate_cert_ret->cert_pem = refresh_cert(ctx->cert_u,
+                                                                    INTERMEDIATE_CERTIFICATE_URL);
+
+    region = get_region(ctx->cert_u);
+    ctx->fed_client->region = region;
+    host = flb_sds_create_size(512);
+    flb_sds_snprintf(&host, flb_sds_alloc(host), "auth.%s.oci.oraclecloud.com", region);
+    upstream = flb_upstream_create(config, host,  443,
+                                   FLB_IO_TLS, ctx->ins->tls);
+    if (!upstream) {
+        return -1;
+    }
+
+    ctx->fed_u = upstream;
+    ctx->fed_client->tenancy_id = get_tenancy_id_from_certificate(ctx->fed_client->leaf_cert_ret->cert);
+    session_key_supplier(&ctx->fed_client->private_key,
+                         &ctx->fed_client->public_key);
+
+    // TODO: build headers
+    u_conn = flb_upstream_conn_get(ctx->fed_u);
+    if (!u_conn) {
+        return -1;
+    }
+
+    sprintf(json,OCI_FEDERATION_REQUEST_PAYLOAD,
+            ctx->fed_client->leaf_cert_ret->cert_pem,
+            ctx->fed_client->public_key,
+            ctx->fed_client->intermediate_cert_ret->cert_pem);
+
+    c = flb_http_client(u_conn, FLB_HTTP_POST, "v1/x509",
+                        json, strlen(json),
+                        NULL, 0, NULL, 0);
+
+    build_federation_client_headers(ctx, c, json, "v1/x509");
+
+
+    for (int i = 0; i < 5; i++) {
+        ret = flb_http_do(c, &b_sent);
+        if (ret != 0) {
+            continue;
+        }
+        if (c->resp.status != 200) {
+            continue;
+        }
+        ctx->fed_client->security_token = parse_token(c->resp.payload,
+                                                      c->resp.payload_size);
+        break;
+
+    }
+     err = get_token_exp(ctx->fed_client->security_token, &ctx->fed_client->expire);
+    if (err) {
+        flb_plg_error(ctx->ins, "%s",err);
+        flb_upstream_conn_release(u_conn);
+        flb_http_client_destroy(c);
+        return -1;
+    }
+    flb_upstream_conn_release(u_conn);
+    flb_http_client_destroy(c);
+    return 0;
 
 }
 

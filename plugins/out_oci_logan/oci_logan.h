@@ -160,6 +160,7 @@ struct federation_client {
   flb_sds_t public_key;
   flb_sds_t key_id;
   flb_sds_t security_token;
+  time_t expire;
   pthread_mutex_t lock;
 };
 
