@@ -284,30 +284,20 @@ flb_sds_t get_tenancy_id_from_certificate(X509 *cert)
 flb_sds_t sanitize_certificate_string(flb_sds_t cert_pem)
 {
     // i2d_X509()
-    flb_sds_t sanitized = cert_pem;
+    flb_sds_t sanitized = flb_sds_create_size(flb_sds_len(cert_pem));
     char c_start[] = "-----BEGIN CERTIFICATE-----";
     char c_end[] = "-----END CERTIFICATE-----";
     char k_start[] = "-----BEGIN PUBLIC KEY-----";
     char k_end[] = "-----END PUBLIC KEY-----";
-    char *start = NULL;
-
-    start = strstr(sanitized, c_start);
-    strcpy(start, "");
-
-    start = strstr(sanitized, c_end);
-    strcpy(start, "");
-
-    start = strstr(sanitized, k_start);
-    strcpy(start, "");
-
-    start = strstr(sanitized, k_end);
-    strcpy(start,"");
-
-    start = strstr(sanitized, "\n");
-    while(start != NULL)
-    {
-        strcpy(start, "");
-        start = strstr(sanitized, "\n");
+    char *start = strtok(cert_pem, "\n");
+    while(start != NULL) {
+        if (strcmp(start, c_start) != 0 &&
+            strcmp(start, c_end) != 0 &&
+            strcmp(start, k_start) != 0 &&
+            strcmp(start, k_end) != 0) {
+            flb_sds_cat_safe(&sanitized, start, strlen(start));
+        }
+        start = strtok(NULL, "\n");
     }
     return sanitized;
 }
@@ -322,7 +312,6 @@ void colon_separated_fingerprint(unsigned char* readbuf, void *writebuf, size_t 
 
     l = (char*) (3*(len - 1) + ((intptr_t) writebuf));
     sprintf(l, "%02x", readbuf[len - 1]);
-
 }
 
 flb_sds_t fingerprint(X509 *cert)
@@ -331,7 +320,7 @@ flb_sds_t fingerprint(X509 *cert)
     flb_sds_t fingerprint = NULL;
     const EVP_MD *digest;
     unsigned char md[SHA_DIGEST_LENGTH];
-    char buf[3*SHA_DIGEST_LENGTH];
+    char buf[3*SHA_DIGEST_LENGTH+1];
     unsigned int n;
 
     digest = EVP_get_digestbyname("sha1");
