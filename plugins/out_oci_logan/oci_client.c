@@ -6,6 +6,7 @@
 
 #include <fluent-bit/flb_output.h>
 #include <fluent-bit/flb_config.h>
+#include <fluent-bit/flb_output_plugin.h>
 
 #include <fluent-bit/flb_crypto.h>
 #include <openssl/rsa.h>
@@ -150,7 +151,8 @@ flb_sds_t create_authorization_header_content(flb_sds_t signature,
 }
 
 flb_sds_t refresh_cert(struct flb_upstream *u,
-                       flb_sds_t cert_url)
+                       flb_sds_t cert_url,
+                       struct flb_output_instance *ins)
 {
     flb_sds_t cert = NULL;
     struct flb_connection *u_conn;
@@ -178,6 +180,7 @@ flb_sds_t refresh_cert(struct flb_upstream *u,
 
     if (ret != 0) {
         flb_errno();
+        flb_plg_error(ins, "http do error");
         flb_upstream_conn_release(u_conn);
         flb_http_client_destroy(c);
         return NULL;
@@ -185,6 +188,7 @@ flb_sds_t refresh_cert(struct flb_upstream *u,
 
     if (c->resp.status != 200 && c->resp.status != 204 && c->resp.status != 201) {
         flb_errno();
+        flb_plg_error(ins, "request was not successful with status = %d", c->resp.status);
         flb_upstream_conn_release(u_conn);
         flb_http_client_destroy(c);
         return NULL;
