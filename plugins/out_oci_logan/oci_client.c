@@ -188,7 +188,8 @@ flb_sds_t refresh_cert(struct flb_upstream *u,
 
     if (c->resp.status != 200 && c->resp.status != 204 && c->resp.status != 201) {
         flb_errno();
-        flb_plg_error(ins, "request was not successful with status = %d", c->resp.status);
+        flb_plg_error(ins, "request was not successful with status = %d payload = %s url = %s",
+                      c->resp.status, c->resp.payload, cert_url);
         flb_upstream_conn_release(u_conn);
         flb_http_client_destroy(c);
         return NULL;
