@@ -365,11 +365,11 @@ X509 *get_cert_from_string(flb_sds_t cert_pem)
     return cert;
 }
 
-flb_sds_t get_region(struct flb_upstream *u)
+flb_sds_t get_region(struct flb_upstream *u,
+                     flb_sds_t region_url)
 {
     flb_sds_t region;
     struct flb_connection *u_conn;
-    char* url;
     struct flb_http_client *c;
     size_t b_sent;
     int ret;
@@ -381,7 +381,7 @@ flb_sds_t get_region(struct flb_upstream *u)
         return NULL;
     }
 
-    c = flb_http_client(u_conn, FLB_HTTP_GET, url,
+    c = flb_http_client(u_conn, FLB_HTTP_GET, region_url,
                         NULL, 0, NULL, 0, NULL, 0);
     if (!c) {
         flb_errno();
