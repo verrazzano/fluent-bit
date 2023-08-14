@@ -44,8 +44,9 @@
 #include <fluent-bit/flb_hash.h>
 #include <fluent-bit/flb_base64.h>
 #include <fluent-bit/flb_http_client.h>
+#include <fluent-bit/flb_output_plugin.h>
 
-flb_sds_t refresh_cert(struct flb_upstream *u, flb_sds_t cert_url);
+flb_sds_t refresh_cert(struct flb_upstream *u, flb_sds_t cert_url, struct flb_output_instance *ins);
 flb_sds_t get_tenancy_id_from_certificate(X509 *cert);
 char* sanitize_certificate_string(flb_sds_t cert_pem);
 void colon_separated_fingerprint(unsigned char* readbuf, void *writebuf, size_t len);
