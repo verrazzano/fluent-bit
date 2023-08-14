@@ -176,7 +176,7 @@ flb_sds_t refresh_cert(struct flb_upstream *u,
 
     ret = flb_http_do(c, &b_sent);
 
-    if (!ret) {
+    if (ret != 0) {
         flb_errno();
         flb_upstream_conn_release(u_conn);
         flb_http_client_destroy(c);
@@ -396,11 +396,15 @@ flb_sds_t get_region(struct flb_upstream *u,
     ret = flb_http_do(c, &b_sent);
 
     if (ret != 0) {
+        flb_upstream_conn_release(u_conn);
+        flb_http_client_destroy(c);
         return NULL;
     }
 
     if (c->resp.status != 200 && c->resp.status != 201 &&
         c->resp.status != 204) {
+        flb_upstream_conn_release(u_conn);
+        flb_http_client_destroy(c);
         return NULL;
     }
 
