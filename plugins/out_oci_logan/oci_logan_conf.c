@@ -214,7 +214,7 @@ int refresh_security_token(struct flb_oci_logan *ctx,
     ctx->fed_client->intermediate_cert_ret->cert_pem = refresh_cert(ctx->cert_u,
                                                                     INTERMEDIATE_CERTIFICATE_URL);
 
-    region = get_region(ctx->cert_u);
+    region = get_region(ctx->cert_u, GET_REGION_URL);
     flb_plg_info(ctx->ins, "region = %s", region);
     ctx->fed_client->region = region;
     host = flb_sds_create_size(512);
