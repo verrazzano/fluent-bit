@@ -186,8 +186,15 @@ int refresh_security_token(struct flb_oci_logan *ctx,
     struct flb_connection *u_conn;
     struct flb_http_client *c;
     int ret = -1;
+    time_t now;
     size_t b_sent;
     char *json = "";
+    if (ctx->fed_client && ctx->fed_client->expire) {
+        now = time(NULL);
+        if (ctx->fed_client->expire > now) {
+            return 0;
+        }
+    }
     if (!ctx->fed_client) {
         ctx->fed_client = flb_calloc(1, sizeof(struct federation_client));
     }
@@ -208,6 +215,7 @@ int refresh_security_token(struct flb_oci_logan *ctx,
                                                                     INTERMEDIATE_CERTIFICATE_URL);
 
     region = get_region(ctx->cert_u);
+    flb_plg_info(ctx->ins, "region = %s", region);
     ctx->fed_client->region = region;
     host = flb_sds_create_size(512);
     flb_sds_snprintf(&host, flb_sds_alloc(host), "auth.%s.oci.oraclecloud.com", region);
@@ -225,6 +233,7 @@ int refresh_security_token(struct flb_oci_logan *ctx,
     ctx->fed_client->key_id = flb_sds_create_size(512);
     flb_sds_snprintf(&ctx->fed_client->key_id, flb_sds_alloc(ctx->fed_client->key_id),
                      "%s/fed-x509/%s", ctx->fed_client->tenancy_id, fingerprint(ctx->fed_client->leaf_cert_ret->cert));
+    flb_plg_info(ctx->ins, "fed client key_id = %s", ctx->fed_client->key_id);
 
     // TODO: build headers
     u_conn = flb_upstream_conn_get(ctx->fed_u);
@@ -236,6 +245,7 @@ int refresh_security_token(struct flb_oci_logan *ctx,
             sanitize_certificate_string(ctx->fed_client->leaf_cert_ret->cert_pem),
             sanitize_certificate_string(ctx->fed_client->public_key),
             sanitize_certificate_string(ctx->fed_client->intermediate_cert_ret->cert_pem));
+    flb_plg_info(ctx->ins, "fed client payload = %s", json);
 
     c = flb_http_client(u_conn, FLB_HTTP_POST, "v1/x509",
                         json, strlen(json),
@@ -259,7 +269,7 @@ int refresh_security_token(struct flb_oci_logan *ctx,
     }
     err = get_token_exp(ctx->fed_client->security_token, &ctx->fed_client->expire);
     if (err) {
-        flb_plg_error(ctx->ins, "%s",err);
+        flb_plg_error(ctx->ins, "token error = %s",err);
         flb_upstream_conn_release(u_conn);
         flb_http_client_destroy(c);
         return -1;
@@ -513,10 +523,12 @@ struct flb_oci_logan *flb_oci_logan_conf_create(struct flb_output_instance *ins,
         return NULL;
     }
 
-    ctx->cert_u = flb_upstream_create(config, METADATA_HOST_BASE, 80, FLB_IO_TCP, NULL);
-    refresh_security_token(ctx, config);
-    ctx->region = ctx->fed_client->region;
-    ctx->private_key = ctx->fed_client->private_key;
+    if (strcmp(ctx->auth_type, INSTANCE_PRINCIPAL) == 0) {
+        ctx->cert_u = flb_upstream_create(config, METADATA_HOST_BASE, 80, FLB_IO_TCP, NULL);
+        refresh_security_token(ctx, config);
+        ctx->region = ctx->fed_client->region;
+        ctx->private_key = ctx->fed_client->private_key;
+    }
 
     // TODO: fetch security token
 
@@ -539,18 +551,20 @@ struct flb_oci_logan *flb_oci_logan_conf_create(struct flb_output_instance *ins,
         }
     }
 
-    if (!ctx->config_file_location) {
-        flb_errno();
-        flb_plg_error(ctx->ins, "config file location is required");
-        flb_oci_logan_conf_destroy(ctx);
-        return NULL;
-    }
+    if (strcasecmp(ctx->auth_type, USER_PRINCIPAL) == 0) {
+        if (!ctx->config_file_location) {
+            flb_errno();
+            flb_plg_error(ctx->ins, "config file location is required");
+            flb_oci_logan_conf_destroy(ctx);
+            return NULL;
+        }
 
-    ret = load_oci_credentials(ctx);
-    if(ret != 0) {
-        flb_errno();
-        flb_oci_logan_conf_destroy(ctx);
-        return NULL;
+        ret = load_oci_credentials(ctx);
+        if (ret != 0) {
+            flb_errno();
+            flb_oci_logan_conf_destroy(ctx);
+            return NULL;
+        }
     }
 
     if (ins->host.name) {
@@ -582,22 +596,24 @@ struct flb_oci_logan *flb_oci_logan_conf_create(struct flb_output_instance *ins,
 
 
 
-    if (create_pk_context(ctx->key_file, NULL, ctx) < 0) {
-        flb_plg_error(ctx->ins, "failed to create pk context");
-        flb_oci_logan_conf_destroy(ctx);
-        return NULL;
+    if (strcasecmp(ctx->auth_type, USER_PRINCIPAL) == 0) {
+        if (create_pk_context(ctx->key_file, NULL, ctx) < 0) {
+            flb_plg_error(ctx->ins, "failed to create pk context");
+            flb_oci_logan_conf_destroy(ctx);
+            return NULL;
+        }
     }
 
 
 
     ctx->key_id = flb_sds_create_size(512);
-    if (!strcmp(ctx->auth_type, USER_PRINCIPAL)) {
+    if (!strcasecmp(ctx->auth_type, USER_PRINCIPAL)) {
         flb_sds_snprintf(&ctx->key_id, flb_sds_alloc(ctx->key_id),
                          "%s/%s/%s", ctx->tenancy, ctx->user, ctx->key_fingerprint);
     }
-    else if (!strcmp(ctx->auth_type, INSTANCE_PRINCIPAL)) {
+    else if (!strcasecmp(ctx->auth_type, INSTANCE_PRINCIPAL)) {
         flb_sds_snprintf(&ctx->key_id, flb_sds_alloc(ctx->key_id),
-                         "ST%s", ctx->fed_client->security_token);
+                         "ST$%s", ctx->fed_client->security_token);
     }
 
     /* Check if SSL/TLS is enabled */

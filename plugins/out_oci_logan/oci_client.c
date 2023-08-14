@@ -205,7 +205,6 @@ flb_sds_t refresh_cert(struct flb_upstream *u,
 flb_sds_t get_tenancy_id_from_certificate(X509 *cert)
 {
     flb_sds_t t_id = NULL;
-    int loc = -1;
     const unsigned char *str;
     char* x;
 
@@ -344,6 +343,13 @@ int session_key_supplier(flb_sds_t *priv_key,
 
     *priv_key = flb_sds_create_len((const char *) priKeyStr, priKeyLen);
     *pub_key = flb_sds_create_len((const char *)pubKeyStr, pubKeyLen);
+
+    BIO_free(pri);
+    BIO_free(pub);
+    EVP_PKEY_CTX_free(ctx);
+    flb_free(priKeyStr);
+    flb_free(pubKeyStr);
+    BN_free(bne);
 
     return 0;
 }

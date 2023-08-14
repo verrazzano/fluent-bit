@@ -939,8 +939,8 @@ static int total_flush(struct flb_event_chunk *event_chunk,
         // msgpack_pack_str(&mp_pck, map.via.map.ptr->val.via.str.size);
         // msgpack_pack_str_body(&mp_pck, map.via.map.ptr->val.via.str.ptr, map.via.str.size);
 
-        msgpack_pack_str(&mp_pck, map.via.map.ptr[0].val.via.str.size);
-        msgpack_pack_str_body(&mp_pck, map.via.map.ptr[0].val.via.str.ptr, map.via.map.ptr[0].val.via.str.size);
+        // msgpack_pack_str(&mp_pck, map.via.map.ptr[0].val.via.str.size);
+        // msgpack_pack_str_body(&mp_pck, map.via.map.ptr[0].val.via.str.ptr, map.via.map.ptr[0].val.via.str.size);
 
 
         for(int i = 0; i < map_size; i++) {
@@ -1007,16 +1007,26 @@ static int total_flush(struct flb_event_chunk *event_chunk,
 static void cb_oci_logan_flush(struct flb_event_chunk *event_chunk,
                               struct flb_output_flush *out_flush,
                               struct flb_input_instance *ins, void *out_context,
-                              struct flb_config *config)
-{
+                              struct flb_config *config) {
     struct flb_oci_logan *ctx = out_context;
     int ret = -1;
+
+    if (strcasecmp(ctx->auth_type, INSTANCE_PRINCIPAL) == 0) {
+        ret = refresh_security_token(ctx, config);
+        if (ret != 0) {
+            // flb_oci_logan_conf_destroy(ctx);
+            FLB_OUTPUT_RETURN(FLB_RETRY);
+        }
+        ctx->private_key = ctx->fed_client->private_key;
+        flb_sds_snprintf(&ctx->key_id, flb_sds_alloc(ctx->key_id),
+                         "ST$%s", ctx->fed_client->security_token);
+    }
 
     ret = total_flush(event_chunk, out_flush,
                       ins, out_context,
                       config);
     if (ret != 0) {
-        flb_oci_logan_conf_destroy(ctx);
+        // flb_oci_logan_conf_destroy(ctx);
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
     flb_plg_info(ctx->ins, "success");
@@ -1112,6 +1122,11 @@ static struct flb_config_map config_map[] = {
         FLB_CONFIG_MAP_STR, "proxy", NULL,
         0, FLB_TRUE, offsetof(struct flb_oci_logan, proxy),
             "define proxy if required, in http://host:port format, supports only http protocol"
+    },
+    {
+        FLB_CONFIG_MAP_STR, "auth_type", INSTANCE_PRINCIPAL,
+        0, FLB_TRUE, offsetof(struct flb_oci_logan, auth_type),
+            "authentication type of the plugin"
     },
 
     {0}
