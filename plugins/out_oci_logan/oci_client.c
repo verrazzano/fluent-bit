@@ -171,6 +171,9 @@ flb_sds_t refresh_cert(struct flb_upstream *u,
         flb_upstream_conn_release(u_conn);
         return NULL;
     }
+
+    flb_http_add_header(c, "Authorization", 13, "Bearer Oracle", 13);
+
     ret = flb_http_do(c, &b_sent);
 
     if (!ret) {
