@@ -62,7 +62,7 @@ flb_sds_t add_header_and_signing(struct flb_http_client *c,
                                  int headersize,
                                  const char *val, int val_size);
 flb_sds_t get_date(void);
-static flb_sds_t create_base64_sha256_signature(flb_sds_t private_key,
+flb_sds_t create_base64_sha256_signature(flb_sds_t private_key,
                                                 flb_sds_t signing_string);
 flb_sds_t create_authorization_header_content(flb_sds_t signature,
                                               flb_sds_t key_id);
