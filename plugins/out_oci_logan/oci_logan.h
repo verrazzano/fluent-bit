@@ -126,11 +126,11 @@
 #define OCI_FEDERATION_REQUEST_PAYLOAD            "{\"certificate\":\"%s\",\"publicKey\":\"%s\", \"intermediateCertificates\":[\"%s\"]}"
 
 #define METADATA_HOST_BASE "169.254.169.254"
-#define GET_REGION_URL  "opc/v1/instance/region"
-#define GET_REGION_INFO_URL "opc/v1/instance/regionInfo/"
-#define LEAF_CERTIFICATE_URL "opc/v1/identity/cert.pem"
-#define LEAF_CERTIFICATE_PRIVATE_KEY_URL "opc/v1/identity/key.pem"
-#define INTERMEDIATE_CERTIFICATE_URL "opc/v1/identity/intermediate.pem"
+#define GET_REGION_URL  "/opc/v2/instance/region"
+#define GET_REGION_INFO_URL "/opc/v2/instance/regionInfo/"
+#define LEAF_CERTIFICATE_URL "/opc/v2/identity/cert.pem"
+#define LEAF_CERTIFICATE_PRIVATE_KEY_URL "/opc/v2/identity/key.pem"
+#define INTERMEDIATE_CERTIFICATE_URL "/opc/v2/identity/intermediate.pem"
 
 
 #include <fluent-bit/flb_upstream.h>
