@@ -611,7 +611,7 @@ static int add_host_and_content_length(struct flb_http_client *c)
     flb_sds_destroy(host);
 
     /* Content-Length */
-    if (c->body_len >= 0) {
+    if (c->body_len > 0) {
         size = 32;
         tmp = flb_malloc(size);
         if (!tmp) {
