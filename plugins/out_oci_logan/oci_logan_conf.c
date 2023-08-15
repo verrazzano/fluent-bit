@@ -20,6 +20,18 @@
 #include "oci_logan.h"
 #include "oci_logan_conf.h"
 
+static int build_region_table(struct flb_oci_logan *ctx) {
+    ctx->region_table = flb_hash_table_create(FLB_HASH_TABLE_EVICT_NONE, 100, 0);
+    int len = sizeof(short_names) - 1;
+    for(int i = 0; i < len; i++) {
+        flb_hash_table_add(ctx->region_table,
+                           short_names[i],
+                           sizeof(short_names[i]) - 1,
+                           long_names[i],
+                           sizeof(long_names[i]) - 1);
+    }
+
+}
 static int build_federation_client_headers(struct flb_oci_logan *ctx,
                                            struct flb_http_client *c,
                                            flb_sds_t json,
@@ -526,6 +538,8 @@ struct flb_oci_logan *flb_oci_logan_conf_create(struct flb_output_instance *ins,
         flb_oci_logan_conf_destroy(ctx);
         return NULL;
     }
+
+    build_region_table(ctx);
 
     if (strcmp(ctx->auth_type, INSTANCE_PRINCIPAL) == 0) {
         ctx->cert_u = flb_upstream_create(config, METADATA_HOST_BASE, 80, FLB_IO_TCP, NULL);

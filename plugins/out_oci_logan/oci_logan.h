@@ -2,6 +2,338 @@
 // Created by Aditya Bharadwaj on 07/07/23.
 //
 
+
+//RegionAPChuncheon1 region Chuncheon
+#define RegionAPChuncheon1 "ap-chuncheon-1"
+//RegionAPHyderabad1 region Hyderabad
+#define RegionAPHyderabad1 "ap-hyderabad-1"
+//RegionAPMelbourne1 region Melbourne
+#define RegionAPMelbourne1 "ap-melbourne-1"
+//RegionAPMumbai1 region Mumbai
+#define RegionAPMumbai1 "ap-mumbai-1"
+//RegionAPOsaka1 region Osaka
+#define RegionAPOsaka1 "ap-osaka-1"
+//RegionAPSeoul1 region Seoul
+#define RegionAPSeoul1 "ap-seoul-1"
+//RegionAPSydney1 region Sydney
+#define RegionAPSydney1 "ap-sydney-1"
+//RegionAPTokyo1 region Tokyo
+#define RegionAPTokyo1 "ap-tokyo-1"
+//RegionCAMontreal1 region Montreal
+#define RegionCAMontreal1 "ca-montreal-1"
+//RegionCAToronto1 region Toronto
+#define RegionCAToronto1 "ca-toronto-1"
+//RegionEUAmsterdam1 region Amsterdam
+#define RegionEUAmsterdam1 "eu-amsterdam-1"
+//RegionFRA region Frankfurt
+#define RegionFRA "eu-frankfurt-1"
+//RegionEUZurich1 region Zurich
+#define RegionEUZurich1 "eu-zurich-1"
+//RegionMEJeddah1 region Jeddah
+#define RegionMEJeddah1 "me-jeddah-1"
+//RegionMEDubai1 region Dubai
+#define RegionMEDubai1 "me-dubai-1"
+//RegionSASaopaulo1 region Saopaulo
+#define RegionSASaopaulo1 "sa-saopaulo-1"
+//RegionUKCardiff1 region Cardiff
+#define RegionUKCardiff1 "uk-cardiff-1"
+//RegionLHR region London
+#define RegionLHR "uk-london-1"
+//RegionIAD region Ashburn
+#define RegionIAD "us-ashburn-1"
+//RegionPHX region Phoenix
+#define RegionPHX "us-phoenix-1"
+//RegionSJC1 region Sanjose
+#define RegionSJC1 "us-sanjose-1"
+//RegionSAVinhedo1 region Vinhedo
+#define RegionSAVinhedo1 "sa-vinhedo-1"
+//RegionSASantiago1 region Santiago
+#define RegionSASantiago1 "sa-santiago-1"
+//RegionILJerusalem1 region Jerusalem
+#define RegionILJerusalem1 "il-jerusalem-1"
+//RegionEUMarseille1 region Marseille
+#define RegionEUMarseille1 "eu-marseille-1"
+//RegionAPSingapore1 region Singapore
+#define RegionAPSingapore1 "ap-singapore-1"
+//RegionMEAbudhabi1 region Abudhabi
+#define RegionMEAbudhabi1 "me-abudhabi-1"
+//RegionEUMilan1 region Milan
+#define RegionEUMilan1 "eu-milan-1"
+//RegionEUStockholm1 region Stockholm
+#define RegionEUStockholm1 "eu-stockholm-1"
+//RegionAFJohannesburg1 region Johannesburg
+#define RegionAFJohannesburg1 "af-johannesburg-1"
+//RegionEUParis1 region Paris
+#define RegionEUParis1 "eu-paris-1"
+//RegionMXQueretaro1 region Queretaro
+#define RegionMXQueretaro1 "mx-queretaro-1"
+//RegionEUMadrid1 region Madrid
+#define RegionEUMadrid1 "eu-madrid-1"
+//RegionUSChicago1 region Chicago
+#define RegionUSChicago1 "us-chicago-1"
+//RegionUSLangley1 region Langley
+#define RegionUSLangley1 "us-langley-1"
+//RegionUSLuke1 region Luke
+#define RegionUSLuke1 "us-luke-1"
+//RegionUSGovAshburn1 gov region Ashburn
+#define RegionUSGovAshburn1 "us-gov-ashburn-1"
+//RegionUSGovChicago1 gov region Chicago
+#define RegionUSGovChicago1 "us-gov-chicago-1"
+//RegionUSGovPhoenix1 gov region Phoenix
+#define RegionUSGovPhoenix1 "us-gov-phoenix-1"
+//RegionUKGovLondon1 gov region London
+#define RegionUKGovLondon1 "uk-gov-london-1"
+//RegionUKGovCardiff1 gov region Cardiff
+#define RegionUKGovCardiff1 "uk-gov-cardiff-1"
+//RegionAPChiyoda1 region Chiyoda
+#define RegionAPChiyoda1 "ap-chiyoda-1"
+//RegionAPIbaraki1 region Ibaraki
+#define RegionAPIbaraki1 "ap-ibaraki-1"
+//RegionMEDccMuscat1 region Muscat
+#define RegionMEDccMuscat1 "me-dcc-muscat-1"
+//RegionAPDccCanberra1 region Canberra
+#define RegionAPDccCanberra1 "ap-dcc-canberra-1"
+//RegionEUDccMilan1 region Milan
+#define RegionEUDccMilan1 "eu-dcc-milan-1"
+//RegionEUDccMilan2 region Milan
+#define RegionEUDccMilan2 "eu-dcc-milan-2"
+//RegionEUDccDublin2 region Dublin
+#define RegionEUDccDublin2 "eu-dcc-dublin-2"
+//RegionEUDccRating2 region Rating
+#define RegionEUDccRating2 "eu-dcc-rating-2"
+//RegionEUDccRating1 region Rating
+#define RegionEUDccRating1 "eu-dcc-rating-1"
+//RegionEUDccDublin1 region Dublin
+#define RegionEUDccDublin1 "eu-dcc-dublin-1"
+//RegionEUMadrid2 region Madrid
+#define RegionEUMadrid2 "eu-madrid-2"
+//RegionEUFrankfurt2 region Frankfurt
+#define RegionEUFrankfurt2 "eu-frankfurt-2"
+//RegionEUJovanovac1 region Jovanovac
+#define RegionEUJovanovac1 "eu-jovanovac-1"
+
+char* short_names[] = {
+"yny",
+"hyd",
+"mel",
+"bom",
+"kix",
+"icn",
+"syd",
+"nrt",
+"yul",
+"yyz",
+"ams",
+"fra",
+"zrh",
+"jed",
+"dxb",
+"gru",
+"cwl",
+"lhr",
+"iad",
+"phx",
+"sjc",
+"vcp",
+"scl",
+"mtz",
+"mrs",
+"sin",
+"auh",
+"lin",
+"arn",
+"jnb",
+"cdg",
+"qro",
+"mad",
+"ord",
+"lfi",
+"luf",
+"ric",
+"pia",
+"tus",
+"ltn",
+"brs",
+"nja",
+"ukb",
+"mct",
+"wga",
+"bgy",
+"mxp",
+"snn",
+"dtm",
+"dus",
+"ork",
+"vll",
+"str",
+"beg"
+};
+
+char *long_names[] = {
+"ap-chuncheon-1",
+"ap-hyderabad-1",
+"ap-melbourne-1",
+"ap-mumbai-1",
+"ap-osaka-1",
+"ap-seoul-1",
+"ap-sydney-1",
+"ap-tokyo-1",
+"ca-montreal-1",
+"ca-toronto-1",
+"eu-amsterdam-1",
+"eu-frankfurt-1",
+"eu-zurich-1",
+"me-jeddah-1",
+"me-dubai-1",
+"sa-saopaulo-1",
+"uk-cardiff-1",
+"uk-london-1",
+"us-ashburn-1",
+"us-phoenix-1",
+"us-sanjose-1",
+"sa-vinhedo-1",
+"sa-santiago-1",
+"il-jerusalem-1",
+"eu-marseille-1",
+"ap-singapore-1",
+"me-abudhabi-1",
+"eu-milan-1",
+"eu-stockholm-1",
+"af-johannesburg-1",
+/*
+    //RegionEUParis1 region Paris
+    RegionEUParis1 Region = "eu-paris-1"
+    //RegionMXQueretaro1 region Queretaro
+    RegionMXQueretaro1 Region = "mx-queretaro-1"
+    //RegionEUMadrid1 region Madrid
+    RegionEUMadrid1 Region = "eu-madrid-1"
+    //RegionUSChicago1 region Chicago
+    RegionUSChicago1 Region = "us-chicago-1"
+    //RegionUSLangley1 region Langley
+    RegionUSLangley1 Region = "us-langley-1"
+    //RegionUSLuke1 region Luke
+    RegionUSLuke1 Region = "us-luke-1"
+    //RegionUSGovAshburn1 gov region Ashburn
+    RegionUSGovAshburn1 Region = "us-gov-ashburn-1"
+    //RegionUSGovChicago1 gov region Chicago
+    RegionUSGovChicago1 Region = "us-gov-chicago-1"
+    //RegionUSGovPhoenix1 gov region Phoenix
+    RegionUSGovPhoenix1 Region = "us-gov-phoenix-1"
+    //RegionUKGovLondon1 gov region London
+    RegionUKGovLondon1 Region = "uk-gov-london-1"
+    //RegionUKGovCardiff1 gov region Cardiff
+    RegionUKGovCardiff1 Region = "uk-gov-cardiff-1"
+    //RegionAPChiyoda1 region Chiyoda
+    RegionAPChiyoda1 Region = "ap-chiyoda-1"
+    //RegionAPIbaraki1 region Ibaraki
+    RegionAPIbaraki1 Region = "ap-ibaraki-1"
+    //RegionMEDccMuscat1 region Muscat
+    RegionMEDccMuscat1 Region = "me-dcc-muscat-1"
+    //RegionAPDccCanberra1 region Canberra
+    RegionAPDccCanberra1 Region = "ap-dcc-canberra-1"
+    //RegionEUDccMilan1 region Milan
+    RegionEUDccMilan1 Region = "eu-dcc-milan-1"
+    //RegionEUDccMilan2 region Milan
+    RegionEUDccMilan2 Region = "eu-dcc-milan-2"
+    //RegionEUDccDublin2 region Dublin
+    RegionEUDccDublin2 Region = "eu-dcc-dublin-2"
+    //RegionEUDccRating2 region Rating
+    RegionEUDccRating2 Region = "eu-dcc-rating-2"
+    //RegionEUDccRating1 region Rating
+    RegionEUDccRating1 Region = "eu-dcc-rating-1"
+    //RegionEUDccDublin1 region Dublin
+    RegionEUDccDublin1 Region = "eu-dcc-dublin-1"
+    //RegionEUMadrid2 region Madrid
+    RegionEUMadrid2 Region = "eu-madrid-2"
+    //RegionEUFrankfurt2 region Frankfurt
+    RegionEUFrankfurt2 Region = "eu-frankfurt-2"
+    //RegionEUJovanovac1 region Jovanovac
+    RegionEUJovanovac1 Region = "eu-jovanovac-1"
+    */
+
+};
+
+/*
+var realm = map[string]string{
+"oc1":  "oraclecloud.com",
+"oc2":  "oraclegovcloud.com",
+"oc3":  "oraclegovcloud.com",
+"oc4":  "oraclegovcloud.uk",
+"oc8":  "oraclecloud8.com",
+"oc9":  "oraclecloud9.com",
+"oc10": "oraclecloud10.com",
+"oc14": "oraclecloud14.com",
+"oc19": "oraclecloud.eu",
+"oc20": "oraclecloud20.com",
+}
+
+var regionRealm = map[Region]string{
+RegionAPChuncheon1:    "oc1",
+RegionAPHyderabad1:    "oc1",
+RegionAPMelbourne1:    "oc1",
+RegionAPMumbai1:       "oc1",
+RegionAPOsaka1:        "oc1",
+RegionAPSeoul1:        "oc1",
+RegionAPSydney1:       "oc1",
+RegionAPTokyo1:        "oc1",
+RegionCAMontreal1:     "oc1",
+RegionCAToronto1:      "oc1",
+RegionEUAmsterdam1:    "oc1",
+RegionFRA:             "oc1",
+RegionEUZurich1:       "oc1",
+RegionMEJeddah1:       "oc1",
+RegionMEDubai1:        "oc1",
+RegionSASaopaulo1:     "oc1",
+RegionUKCardiff1:      "oc1",
+RegionLHR:             "oc1",
+RegionIAD:             "oc1",
+RegionPHX:             "oc1",
+RegionSJC1:            "oc1",
+RegionSAVinhedo1:      "oc1",
+RegionSASantiago1:     "oc1",
+RegionILJerusalem1:    "oc1",
+RegionEUMarseille1:    "oc1",
+RegionAPSingapore1:    "oc1",
+RegionMEAbudhabi1:     "oc1",
+RegionEUMilan1:        "oc1",
+RegionEUStockholm1:    "oc1",
+RegionAFJohannesburg1: "oc1",
+RegionEUParis1:        "oc1",
+RegionMXQueretaro1:    "oc1",
+RegionEUMadrid1:       "oc1",
+RegionUSChicago1:      "oc1",
+
+RegionUSLangley1: "oc2",
+RegionUSLuke1:    "oc2",
+
+RegionUSGovAshburn1: "oc3",
+RegionUSGovChicago1: "oc3",
+RegionUSGovPhoenix1: "oc3",
+
+RegionUKGovLondon1:  "oc4",
+RegionUKGovCardiff1: "oc4",
+
+RegionAPChiyoda1: "oc8",
+RegionAPIbaraki1: "oc8",
+
+RegionMEDccMuscat1: "oc9",
+
+RegionAPDccCanberra1: "oc10",
+
+RegionEUDccMilan1:  "oc14",
+RegionEUDccMilan2:  "oc14",
+RegionEUDccDublin2: "oc14",
+RegionEUDccRating2: "oc14",
+RegionEUDccRating1: "oc14",
+RegionEUDccDublin1: "oc14",
+
+RegionEUMadrid2:    "oc19",
+RegionEUFrankfurt2: "oc19",
+
+RegionEUJovanovac1: "oc20",
+}
+*/
+
 #ifndef FLB_OUT_OCI_LOGAN_H
 #define FLB_OUT_OCI_LOGAN_H
 
@@ -229,7 +561,7 @@ struct flb_oci_logan {
 
     struct federation_client *fed_client;
 
-    struct flb_hash_table region_table;
+    struct flb_hash_table *region_table;
 
     struct flb_output_instance *ins;
 
