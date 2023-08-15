@@ -176,8 +176,9 @@ flb_sds_t refresh_cert(struct flb_upstream *u,
 
     flb_http_strip_port_from_host(c);
     flb_http_buffer_size(c, 0);
-    flb_http_add_header(c, "Authorization", 13, "Bearer Oracle", 13);
+    flb_http_add_header(c, "User-Agent", 10, "Fluent-Bit", 10);
     flb_http_add_header(c, "Accept", 6, "*/*", 3);
+    flb_http_add_header(c, "Authorization", 13, "Bearer Oracle", 13);
 
     ret = flb_http_do(c, &b_sent);
 
