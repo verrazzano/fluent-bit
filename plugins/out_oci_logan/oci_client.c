@@ -174,10 +174,9 @@ flb_sds_t refresh_cert(struct flb_upstream *u,
         return NULL;
     }
 
+    flb_http_buffer_size(c, 0);
     flb_http_add_header(c, "Authorization", 13, "Bearer Oracle", 13);
     flb_http_add_header(c, "Accept", 6, "*/*", 3);
-
-    flb_plg_info(ins, "request header = %s", c->header_buf);
 
     ret = flb_http_do(c, &b_sent);
 
@@ -191,6 +190,7 @@ flb_sds_t refresh_cert(struct flb_upstream *u,
 
     if (c->resp.status != 200 && c->resp.status != 204 && c->resp.status != 201) {
         flb_errno();
+        flb_plg_info(ins, "request header = %s", c->header_buf);
         flb_plg_error(ins, "request was not successful with status = %d payload = %s url = %s",
                       c->resp.status, c->resp.payload, cert_url);
         flb_upstream_conn_release(u_conn);
