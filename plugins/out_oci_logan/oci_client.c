@@ -401,8 +401,9 @@ flb_sds_t get_region(struct flb_upstream *u,
         return NULL;
     }
 
-    flb_http_add_header(c, "Authorization", 13, "Bearer Oracle", 13);
+    flb_http_add_header(c, "User-Agent", 10, "Fluent-Bit", 10);
     flb_http_add_header(c, "Accept", 6, "*/*", 3);
+    flb_http_add_header(c, "Authorization", 13, "Bearer Oracle", 13);
 
     ret = flb_http_do(c, &b_sent);
 
