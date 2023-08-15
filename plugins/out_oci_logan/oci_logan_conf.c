@@ -253,6 +253,7 @@ int refresh_security_token(struct flb_oci_logan *ctx,
     c = flb_http_client(u_conn, FLB_HTTP_POST, "v1/x509",
                         json, strlen(json),
                         NULL, 0, NULL, 0);
+    c->allow_dup_headers = FLB_FALSE;
 
     build_federation_client_headers(ctx, c, json, "v1/x509");
 

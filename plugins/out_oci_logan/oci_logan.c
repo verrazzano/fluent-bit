@@ -494,6 +494,7 @@ static int flush_to_endpoint(struct flb_oci_logan *ctx,
     if (!c) {
         goto error_label;
     }
+    c->allow_dup_headers = FLB_FALSE;
     flb_plg_info(ctx->ins, "built client");
     flb_http_buffer_size(c, FLB_HTTP_DATA_SIZE_MAX);
     if (build_headers(c, ctx, payload, ctx->ins->host.name, ctx->ins->host.port, full_uri) < 0) {

@@ -753,7 +753,7 @@ struct flb_http_client *flb_http_client(struct flb_connection *u_conn,
         c->body_len = body_len;
     }
 
-    // add_host_and_content_length(c);
+    add_host_and_content_length(c);
 
     /* Check proxy data */
     if (proxy) {
