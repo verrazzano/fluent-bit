@@ -379,12 +379,14 @@ X509 *get_cert_from_string(flb_sds_t cert_pem)
 }
 
 flb_sds_t get_region(struct flb_upstream *u,
-                     flb_sds_t region_url)
+                     flb_sds_t region_url,
+                     struct flb_hash_table *ht)
 {
     flb_sds_t region;
+    char* temp_region = NULL;
     struct flb_connection *u_conn;
     struct flb_http_client *c;
-    size_t b_sent;
+    size_t b_sent, temp_sz;
     int ret;
 
     // TODO: construct region uri
@@ -420,8 +422,17 @@ flb_sds_t get_region(struct flb_upstream *u,
         return NULL;
     }
 
-    region = flb_sds_create_len(mk_string_tolower(c->resp.payload),
-                                        (int) c->resp.payload_size);
+    ret = flb_hash_table_get(ht, mk_string_tolower(c->resp.payload),
+                             (int)c->resp.payload_size,
+                             (void *)temp_region,
+                             &temp_sz);
+    if (ret < 0) {
+        temp_region = c->resp.payload;
+        temp_sz = c->resp.payload_size;
+    }
+
+    region = flb_sds_create_len(temp_region,
+                                (int) temp_sz);
 
     return region;
 }

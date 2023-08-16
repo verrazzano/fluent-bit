@@ -200,57 +200,30 @@ char *long_names[] = {
 "eu-milan-1",
 "eu-stockholm-1",
 "af-johannesburg-1",
-/*
-    //RegionEUParis1 region Paris
-    RegionEUParis1 Region = "eu-paris-1"
-    //RegionMXQueretaro1 region Queretaro
-    RegionMXQueretaro1 Region = "mx-queretaro-1"
-    //RegionEUMadrid1 region Madrid
-    RegionEUMadrid1 Region = "eu-madrid-1"
-    //RegionUSChicago1 region Chicago
-    RegionUSChicago1 Region = "us-chicago-1"
-    //RegionUSLangley1 region Langley
-    RegionUSLangley1 Region = "us-langley-1"
-    //RegionUSLuke1 region Luke
-    RegionUSLuke1 Region = "us-luke-1"
-    //RegionUSGovAshburn1 gov region Ashburn
-    RegionUSGovAshburn1 Region = "us-gov-ashburn-1"
-    //RegionUSGovChicago1 gov region Chicago
-    RegionUSGovChicago1 Region = "us-gov-chicago-1"
-    //RegionUSGovPhoenix1 gov region Phoenix
-    RegionUSGovPhoenix1 Region = "us-gov-phoenix-1"
-    //RegionUKGovLondon1 gov region London
-    RegionUKGovLondon1 Region = "uk-gov-london-1"
-    //RegionUKGovCardiff1 gov region Cardiff
-    RegionUKGovCardiff1 Region = "uk-gov-cardiff-1"
-    //RegionAPChiyoda1 region Chiyoda
-    RegionAPChiyoda1 Region = "ap-chiyoda-1"
-    //RegionAPIbaraki1 region Ibaraki
-    RegionAPIbaraki1 Region = "ap-ibaraki-1"
-    //RegionMEDccMuscat1 region Muscat
-    RegionMEDccMuscat1 Region = "me-dcc-muscat-1"
-    //RegionAPDccCanberra1 region Canberra
-    RegionAPDccCanberra1 Region = "ap-dcc-canberra-1"
-    //RegionEUDccMilan1 region Milan
-    RegionEUDccMilan1 Region = "eu-dcc-milan-1"
-    //RegionEUDccMilan2 region Milan
-    RegionEUDccMilan2 Region = "eu-dcc-milan-2"
-    //RegionEUDccDublin2 region Dublin
-    RegionEUDccDublin2 Region = "eu-dcc-dublin-2"
-    //RegionEUDccRating2 region Rating
-    RegionEUDccRating2 Region = "eu-dcc-rating-2"
-    //RegionEUDccRating1 region Rating
-    RegionEUDccRating1 Region = "eu-dcc-rating-1"
-    //RegionEUDccDublin1 region Dublin
-    RegionEUDccDublin1 Region = "eu-dcc-dublin-1"
-    //RegionEUMadrid2 region Madrid
-    RegionEUMadrid2 Region = "eu-madrid-2"
-    //RegionEUFrankfurt2 region Frankfurt
-    RegionEUFrankfurt2 Region = "eu-frankfurt-2"
-    //RegionEUJovanovac1 region Jovanovac
-    RegionEUJovanovac1 Region = "eu-jovanovac-1"
-    */
-
+"eu-paris-1",
+"mx-queretaro-1",
+"eu-madrid-1",
+"us-chicago-1",
+"us-langley-1",
+"us-luke-1",
+"us-gov-ashburn-1",
+"us-gov-chicago-1",
+"us-gov-phoenix-1",
+"uk-gov-london-1",
+"uk-gov-cardiff-1",
+"ap-chiyoda-1",
+"ap-ibaraki-1",
+"me-dcc-muscat-1",
+"ap-dcc-canberra-1",
+"eu-dcc-milan-1",
+"eu-dcc-milan-2",
+"eu-dcc-dublin-2",
+"eu-dcc-rating-2",
+"eu-dcc-rating-1",
+"eu-dcc-dublin-1",
+"eu-madrid-2",
+"eu-frankfurt-2",
+"eu-jovanovac-1"
 };
 
 /*
