@@ -46,7 +46,8 @@
 #include <fluent-bit/flb_http_client.h>
 #include <fluent-bit/flb_output_plugin.h>
 
-flb_sds_t refresh_cert(struct flb_upstream *u, flb_sds_t cert_url, struct flb_output_instance *ins);
+flb_sds_t refresh_cert(struct flb_upstream *u, flb_sds_t cert_url,
+                       struct flb_output_instance *ins);
 flb_sds_t get_tenancy_id_from_certificate(X509 *cert);
 char* sanitize_certificate_string(flb_sds_t cert_pem);
 void colon_separated_fingerprint(unsigned char* readbuf, void *writebuf, size_t len);
@@ -54,7 +55,8 @@ flb_sds_t fingerprint(X509 *cert);
 int session_key_supplier(flb_sds_t *priv_key,
                          flb_sds_t *pub_key);
 X509 *get_cert_from_string(flb_sds_t cert_pem);
-flb_sds_t get_region(struct flb_upstream *u, flb_sds_t region_url);
+flb_sds_t get_region(struct flb_upstream *u, flb_sds_t region_url,
+                     struct flb_hash_table *ht);
 flb_sds_t parse_token(char *response,
                       size_t response_len);
 flb_sds_t add_header_and_signing(struct flb_http_client *c,
