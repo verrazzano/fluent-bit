@@ -425,10 +425,12 @@ int refresh_security_token(struct flb_oci_logan *ctx,
         flb_plg_error(ctx->ins, "token error = %s",err);
         flb_upstream_conn_release(u_conn);
         flb_http_client_destroy(c);
+        flb_free(json);
         return -1;
     }
     flb_upstream_conn_release(u_conn);
     flb_http_client_destroy(c);
+    flb_free(json);
     return 0;
 
 }
