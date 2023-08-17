@@ -347,12 +347,12 @@ int session_key_supplier(flb_sds_t *priv_key,
 
     priKeyLen = BIO_pending(pri);
     pubKeyLen = BIO_pending(pub);
-    priKeyStr = flb_malloc(priKeyLen + 1);
-    pubKeyStr = flb_malloc(pubKeyLen + 1);
+    priKeyStr = flb_malloc(priKeyLen);
+    pubKeyStr = flb_malloc(pubKeyLen);
     BIO_read(pri, priKeyStr, priKeyLen);
     BIO_read(pub, pubKeyStr, pubKeyLen);
-    priKeyStr[priKeyLen] = '\0';
-    pubKeyStr[pubKeyLen] = '\0';
+    // priKeyStr[priKeyLen] = '\0';
+    // pubKeyStr[pubKeyLen] = '\0';
 
     *priv_key = flb_sds_create_len((const char *) priKeyStr, priKeyLen);
     *pub_key = flb_sds_create_len((const char *)pubKeyStr, pubKeyLen);
