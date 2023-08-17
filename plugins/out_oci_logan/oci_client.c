@@ -316,7 +316,8 @@ flb_sds_t fingerprint(X509 *cert)
 }
 
 int session_key_supplier(flb_sds_t *priv_key,
-                         flb_sds_t *pub_key)
+                         flb_sds_t *pub_key,
+                         struct flb_output_instance *ins)
 {
     // Key generation
     EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_RSA, NULL);
@@ -351,8 +352,10 @@ int session_key_supplier(flb_sds_t *priv_key,
     pubKeyStr = flb_malloc(pubKeyLen);
     BIO_read(pri, priKeyStr, priKeyLen);
     BIO_read(pub, pubKeyStr, pubKeyLen);
-    // priKeyStr[priKeyLen] = '\0';
-    // pubKeyStr[pubKeyLen] = '\0';
+    priKeyStr[priKeyLen] = '\0';
+    pubKeyStr[pubKeyLen] = '\0';
+    flb_plg_info(ins, "private_key = %s", priKeyStr);
+    flb_plg_info(ins, "pub_key = %s", pubKeyStr);
 
     *priv_key = flb_sds_create_len((const char *) priKeyStr, priKeyLen);
     *pub_key = flb_sds_create_len((const char *)pubKeyStr, pubKeyLen);

@@ -369,8 +369,13 @@ int refresh_security_token(struct flb_oci_logan *ctx,
 
     ctx->fed_u = upstream;
     ctx->fed_client->tenancy_id = get_tenancy_id_from_certificate(ctx->fed_client->leaf_cert_ret->cert);
-    session_key_supplier(&ctx->fed_client->private_key,
-                         &ctx->fed_client->public_key);
+    ret = session_key_supplier(&ctx->fed_client->private_key,
+                         &ctx->fed_client->public_key,
+                         ctx->ins);
+    if (ret != 0) {
+        flb_plg_error(ctx->ins, "failed to create session key pair");
+        return -1;
+    }
 
     ctx->fed_client->key_id = flb_sds_create_size(512);
     flb_sds_snprintf(&ctx->fed_client->key_id, flb_sds_alloc(ctx->fed_client->key_id),

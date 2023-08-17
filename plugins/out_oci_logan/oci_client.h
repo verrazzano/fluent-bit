@@ -53,7 +53,8 @@ char* sanitize_certificate_string(flb_sds_t cert_pem);
 void colon_separated_fingerprint(unsigned char* readbuf, void *writebuf, size_t len);
 flb_sds_t fingerprint(X509 *cert);
 int session_key_supplier(flb_sds_t *priv_key,
-                         flb_sds_t *pub_key);
+                         flb_sds_t *pub_key,
+                         struct flb_output_instance *ins);
 X509 *get_cert_from_string(flb_sds_t cert_pem);
 flb_sds_t get_region(struct flb_upstream *u, flb_sds_t region_url,
                      struct flb_hash_table *ht);
