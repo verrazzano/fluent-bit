@@ -241,7 +241,7 @@ flb_sds_t get_tenancy_id_from_certificate(X509 *cert)
 char* sanitize_certificate_string(flb_sds_t cert_pem)
 {
     // i2d_X509()
-    char sanitized[flb_sds_len(cert_pem) + 1];
+    char sanitized[strlen(cert_pem) + 1];
     strcpy(sanitized, cert_pem);
     char c_start[] = "-----BEGIN CERTIFICATE-----";
     size_t c_st_len = strlen(c_start);
