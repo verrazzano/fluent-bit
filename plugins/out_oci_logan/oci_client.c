@@ -424,7 +424,7 @@ flb_sds_t get_region(struct flb_upstream *u,
 
     ret = flb_hash_table_get(ht, mk_string_tolower(c->resp.payload),
                              (int)c->resp.payload_size,
-                             (void *)temp_region,
+                             (void *)&temp_region,
                              &temp_sz);
     if (ret < 0) {
         temp_region = c->resp.payload;
