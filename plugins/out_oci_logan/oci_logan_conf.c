@@ -847,11 +847,58 @@ struct flb_oci_logan *flb_oci_logan_conf_create(struct flb_output_instance *ins,
     return ctx;
 }
 
+int flb_cert_ret_destroy(struct cert_retriever *cert_ret) {
+    if (cert_ret->cert_pem) {
+        flb_sds_destroy(cert_ret->cert_pem);
+    }
+    if (cert_ret->private_key_pem) {
+        flb_sds_destroy(cert_ret->private_key_pem);
+    }
+    if (cert_ret->cert) {
+        X509_free(cert_ret->cert);
+    }
+}
+int flb_fed_client_destroy(struct federation_client *fd) {
+    if (fd->security_token) {
+        flb_sds_destroy(fd->security_token);
+    }
+    if (fd->leaf_cert_ret) {
+        flb_cert_ret_destroy(fd->leaf_cert_ret);
+    }
+    if (fd->key_id) {
+        flb_sds_destroy(fd->key_id);
+    }
+    if (fd->public_key) {
+        flb_sds_destroy(fd->public_key);
+    }
+    if (fd->tenancy_id) {
+        flb_sds_destroy(fd->tenancy_id);
+    }
+    if (fd->private_key) {
+        flb_sds_destroy(fd->private_key);
+    }
+    if (fd->intermediate_cert_ret) {
+        flb_cert_ret_destroy(fd->intermediate_cert_ret);
+    }
+    if (fd->region) {
+        flb_sds_destroy(fd->region);
+    }
+}
+
 int flb_oci_logan_conf_destroy(struct flb_oci_logan *ctx) {
     if(ctx == NULL) {
         return 0;
     }
 
+    if (ctx->fed_client) {
+        flb_fed_client_destroy(ctx->fed_client);
+    }
+    if (ctx->cert_u) {
+        flb_upstream_destroy(ctx->cert_u);
+    }
+    if (ctx->fed_u) {
+        flb_upstream_destroy(ctx->fed_u);
+    }
     if(ctx->oci_la_entity_id) {
         flb_sds_destroy(ctx->oci_la_entity_id);
     }
