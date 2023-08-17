@@ -251,7 +251,8 @@ char* sanitize_certificate_string(flb_sds_t cert_pem)
     size_t k_st_len = strlen(k_start);
     char k_end[] = "-----END PUBLIC KEY-----";
     size_t k_end_len = strlen(k_end);
-    char *p = NULL, *ans;
+    char *p = NULL, *ans, *tmp;
+    int i;
 
     p = strstr(sanitized, c_start);
     if (p) {
@@ -273,16 +274,20 @@ char* sanitize_certificate_string(flb_sds_t cert_pem)
         memcpy(p, "", 0);
         memmove(p, p + k_end_len, strlen(p + k_end_len) + 1);
     }
-    p = strtok(sanitized, "\n");
-    while(p != NULL)
-    {
-        if (strlen(p)) {
-            ans = p;
-        }
-        p = strtok(NULL, "\n");
+    ans = flb_malloc(strlen(sanitized) + sizeof(char));
+    if (!ans) {
+        return NULL;
     }
-
+    tmp = ans;
+    for(i = 0; sanitized[i] != '\0'; i++)
+    {
+        if(sanitized[i] != '\t' && sanitized[i] != '\n') {
+            *tmp++ = sanitized[i];
+        }
+    }
+    *tmp = '\0';
     return ans;
+
 }
 
 void colon_separated_fingerprint(unsigned char* readbuf, void *writebuf, size_t len)

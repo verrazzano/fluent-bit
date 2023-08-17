@@ -389,10 +389,13 @@ int refresh_security_token(struct flb_oci_logan *ctx,
     }
 
     s_leaf_cert = sanitize_certificate_string(ctx->fed_client->leaf_cert_ret->cert_pem);
+    flb_plg_info(ctx->ins, "sanitized leaf cert: %s", s_leaf_cert);
     s_pub_key = sanitize_certificate_string(ctx->fed_client->public_key);
+    flb_plg_info(ctx->ins, "pub key: %s", s_pub_key);
     s_inter_cert = sanitize_certificate_string(ctx->fed_client->intermediate_cert_ret->cert_pem);
+    flb_plg_info(ctx->ins, "sanitized inter cert: %s", s_inter_cert);
     sz = strlen(s_leaf_cert) + strlen(s_pub_key) + strlen(s_inter_cert);
-    json = flb_malloc((sz + 100));
+    json = flb_malloc((sz + 500));
     sprintf(json,OCI_FEDERATION_REQUEST_PAYLOAD,
             s_leaf_cert,
             s_pub_key,
@@ -407,22 +410,34 @@ int refresh_security_token(struct flb_oci_logan *ctx,
     build_federation_client_headers(ctx, c, json, "v1/x509");
 
 
-    for (int i = 0; i < 5; i++) {
         ret = flb_http_do(c, &b_sent);
         if (ret != 0) {
-            continue;
+            flb_upstream_conn_release(u_conn);
+            flb_http_client_destroy(c);
+            flb_free(json);
+            flb_free(s_leaf_cert);
+            flb_free(s_pub_key);
+            flb_free(s_inter_cert);
+            return -1;
         }
         if (c->resp.status != 200) {
-            continue;
+            flb_upstream_conn_release(u_conn);
+            flb_http_client_destroy(c);
+            flb_free(json);
+            flb_free(s_leaf_cert);
+            flb_free(s_pub_key);
+            flb_free(s_inter_cert);
+            return -1;
         }
         ctx->fed_client->security_token = parse_token(c->resp.payload,
                                                       c->resp.payload_size);
-        break;
 
-    }
     err = get_token_exp(ctx->fed_client->security_token, &ctx->fed_client->expire);
     if (err) {
         flb_plg_error(ctx->ins, "token error = %s",err);
+        flb_free(s_leaf_cert);
+        flb_free(s_pub_key);
+        flb_free(s_inter_cert);
         flb_upstream_conn_release(u_conn);
         flb_http_client_destroy(c);
         flb_free(json);
@@ -431,6 +446,9 @@ int refresh_security_token(struct flb_oci_logan *ctx,
     flb_upstream_conn_release(u_conn);
     flb_http_client_destroy(c);
     flb_free(json);
+    flb_free(s_leaf_cert);
+    flb_free(s_pub_key);
+    flb_free(s_inter_cert);
     return 0;
 
 }
