@@ -315,7 +315,7 @@ int refresh_security_token(struct flb_oci_logan *ctx,
     struct flb_connection *u_conn;
     struct flb_http_client *c;
     char *s_leaf_cert, *s_inter_cert, *s_pub_key;
-    int ret = -1;
+    int ret = -1, sz;
     time_t now;
     size_t b_sent;
     char *json = "";
@@ -391,6 +391,8 @@ int refresh_security_token(struct flb_oci_logan *ctx,
     s_leaf_cert = sanitize_certificate_string(ctx->fed_client->leaf_cert_ret->cert_pem);
     s_pub_key = sanitize_certificate_string(ctx->fed_client->public_key);
     s_inter_cert = sanitize_certificate_string(ctx->fed_client->intermediate_cert_ret->cert_pem);
+    sz = strlen(s_leaf_cert) + strlen(s_pub_key) + strlen(s_inter_cert);
+    json = flb_malloc((sz + 100) / sizeof(char));
     sprintf(json,OCI_FEDERATION_REQUEST_PAYLOAD,
             s_leaf_cert,
             s_pub_key,
