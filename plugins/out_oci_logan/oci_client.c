@@ -332,7 +332,7 @@ int session_key_supplier(flb_sds_t *priv_key,
 
     bne = BN_new();
     ret = BN_set_word(bne, RSA_EXP);
-    if (ret != -1) {
+    if (ret != 1) {
         return -1;
     }
     EVP_PKEY_keygen_init(ctx);
