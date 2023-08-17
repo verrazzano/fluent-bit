@@ -362,7 +362,6 @@ int session_key_supplier(flb_sds_t *priv_key,
 
     BIO_free(pri);
     BIO_free(pub);
-    EVP_PKEY_CTX_free(ctx);
     flb_free(priKeyStr);
     flb_free(pubKeyStr);
     BN_free(bne);
