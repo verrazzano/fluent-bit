@@ -337,14 +337,23 @@ int refresh_security_token(struct flb_oci_logan *ctx,
     ctx->fed_client->leaf_cert_ret->cert_pem = refresh_cert(ctx->cert_u,
                                                             LEAF_CERTIFICATE_URL,
                                                             ctx->ins);
+    if (!ctx->fed_client->leaf_cert_ret->cert_pem) {
+        return -1;
+    }
     ctx->fed_client->leaf_cert_ret->private_key_pem = refresh_cert(ctx->cert_u,
                                                                    LEAF_CERTIFICATE_PRIVATE_KEY_URL,
                                                                    ctx->ins);
+    if (!ctx->fed_client->leaf_cert_ret->private_key_pem) {
+        return -1;
+    }
     ctx->fed_client->leaf_cert_ret->cert = get_cert_from_string(ctx->fed_client->leaf_cert_ret->cert_pem);
 
     ctx->fed_client->intermediate_cert_ret->cert_pem = refresh_cert(ctx->cert_u,
                                                                     INTERMEDIATE_CERTIFICATE_URL,
                                                                     ctx->ins);
+    if (!ctx->fed_client->intermediate_cert_ret->cert_pem) {
+        return -1;
+    }
 
     region = get_region(ctx->cert_u, GET_REGION_URL, ctx->region_table);
     flb_plg_info(ctx->ins, "region = %s", region);
