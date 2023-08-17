@@ -74,7 +74,8 @@ char* short_names[] = {
     "ork",
     "vll",
     "str",
-    "beg"
+    "beg",
+    NULL
 };
 
 char *long_names[] = {
@@ -131,13 +132,14 @@ char *long_names[] = {
     "eu-dcc-dublin-1",
     "eu-madrid-2",
     "eu-frankfurt-2",
-    "eu-jovanovac-1"
+    "eu-jovanovac-1",
+    NULL
 };
 
-static int build_region_table(struct flb_oci_logan *ctx) {
+static void build_region_table(struct flb_oci_logan *ctx) {
     ctx->region_table = flb_hash_table_create(FLB_HASH_TABLE_EVICT_NONE, 100, 0);
-    int len = sizeof(short_names) - 1;
-    for(int i = 0; i < len; i++) {
+    int i;
+    for(i = 0; short_names[i] != NULL; i++) {
         flb_hash_table_add(ctx->region_table,
                            short_names[i],
                            sizeof(short_names[i]) - 1,
@@ -146,6 +148,7 @@ static int build_region_table(struct flb_oci_logan *ctx) {
     }
 
 }
+
 static int build_federation_client_headers(struct flb_oci_logan *ctx,
                                            struct flb_http_client *c,
                                            flb_sds_t json,
