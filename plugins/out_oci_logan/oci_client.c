@@ -246,46 +246,36 @@ char* sanitize_certificate_string(flb_sds_t cert_pem)
     char c_start[] = "-----BEGIN CERTIFICATE-----";
     size_t c_st_len = strlen(c_start);
     char c_end[] = "-----END CERTIFICATE-----";
-    size_t c_end_len = strlen(c_end);
     char k_start[] = "-----BEGIN PUBLIC KEY-----";
     size_t k_st_len = strlen(k_start);
     char k_end[] = "-----END PUBLIC KEY-----";
-    size_t k_end_len = strlen(k_end);
-    char *p = NULL, *ans, *tmp;
-    int i;
+    char *p = NULL, *q = NULL, *ans, *tmp, *a;
 
     p = strstr(sanitized, c_start);
-    if (p) {
-        memcpy(p, "", 0);
-        memmove(p, p + c_st_len, strlen(p + c_st_len) + 1);
+    q = strstr(sanitized, c_end);
+    if (p && q) {
+        *q = '\0';
+        tmp = p + c_st_len + 1;
     }
-    p = strstr(sanitized, c_end);
-    if (p) {
-        memcpy(p, "", 0);
-        memmove(p, p + c_end_len, strlen(p + c_end_len) + 1);
-    }
-    p = strstr(sanitized, k_start);
-    if (p) {
-        memcpy(p, "", 0);
-        memmove(p, p + k_st_len, strlen(p + k_st_len) + 1);
-    }
-    p = strstr(sanitized, k_end);
-    if (p) {
-        memcpy(p, "", 0);
-        memmove(p, p + k_end_len, strlen(p + k_end_len) + 1);
+    else {
+        p = strstr(sanitized, k_start);
+        q = strstr(sanitized, k_end);
+        *q = '\0';
+        tmp = p + k_st_len;
     }
     ans = flb_malloc(strlen(sanitized) + sizeof(char));
-    if (!ans) {
-        return NULL;
-    }
-    tmp = ans;
-    for(i = 0; sanitized[i] != '\0'; i++)
+    a = ans;
+    while(*tmp != '\0')
     {
-        if(sanitized[i] != '\t' && sanitized[i] != '\n') {
-            *tmp++ = sanitized[i];
+        if(*tmp != '\t' && *tmp != '\n') {
+            *a++ = *tmp++;
+        }
+        else {
+            ++tmp;
         }
     }
-    *tmp = '\0';
+    *a = '\0';
+
     return ans;
 
 }
