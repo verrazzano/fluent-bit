@@ -414,6 +414,7 @@ int refresh_security_token(struct flb_oci_logan *ctx,
 
         ret = flb_http_do(c, &b_sent);
         if (ret != 0) {
+            flb_plg_error(ctx->ins, "http do error");
             flb_upstream_conn_release(u_conn);
             flb_http_client_destroy(c);
             flb_free(json);
@@ -424,6 +425,7 @@ int refresh_security_token(struct flb_oci_logan *ctx,
             return -1;
         }
         if (c->resp.status != 200) {
+            flb_plg_error(ctx->ins, "http status = %d, response = %s", c->resp.status, c->resp.payload);
             flb_upstream_conn_release(u_conn);
             flb_http_client_destroy(c);
             flb_free(json);
@@ -707,7 +709,12 @@ struct flb_oci_logan *flb_oci_logan_conf_create(struct flb_output_instance *ins,
 
     if (strcmp(ctx->auth_type, INSTANCE_PRINCIPAL) == 0) {
         ctx->cert_u = flb_upstream_create(config, METADATA_HOST_BASE, 80, FLB_IO_TCP, NULL);
-        refresh_security_token(ctx, config);
+        ret = refresh_security_token(ctx, config);
+        if (ret != 0) {
+            flb_errno();
+            flb_oci_logan_conf_destroy(ctx);
+            return NULL;
+        }
         // ctx->region = ctx->fed_client->region;
         // ctx->private_key = ctx->fed_client->private_key;
     }
