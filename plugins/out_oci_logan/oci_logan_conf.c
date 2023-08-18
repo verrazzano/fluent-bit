@@ -182,7 +182,7 @@ static int build_federation_client_headers(struct flb_oci_logan *ctx,
     }
 
     // Add (requeset-target) to signing string
-    encoded_uri = flb_uri_encode(uri, strlen(uri));
+    encoded_uri = flb_uri_encode(uri, flb_sds_len(uri));
     if (!encoded_uri) {
         flb_errno();
         goto error_label;
@@ -245,7 +245,7 @@ static int build_federation_client_headers(struct flb_oci_logan *ctx,
 
     // Add content-Length
     tmp_len = snprintf(tmp_sds, flb_sds_alloc(tmp_sds) - 1, "%i",
-                       (int) flb_sds_len(json));
+                       (int) strlen(json));
     flb_sds_len_set(tmp_sds, tmp_len);
     signing_str = add_header_and_signing(c, signing_str,
                                          FLB_OCI_HEADER_CONTENT_LENGTH, sizeof(FLB_OCI_HEADER_CONTENT_LENGTH) - 1,
@@ -323,7 +323,7 @@ int refresh_security_token(struct flb_oci_logan *ctx,
     int ret = -1, sz;
     time_t now;
     size_t b_sent;
-    char *json = "";
+    flb_sds_t json;
     if (ctx->fed_client && ctx->fed_client->expire) {
         now = time(NULL);
         if (ctx->fed_client->expire > now) {
@@ -385,7 +385,7 @@ int refresh_security_token(struct flb_oci_logan *ctx,
     ctx->fed_client->key_id = flb_sds_create_size(512);
     flb_sds_snprintf(&ctx->fed_client->key_id, flb_sds_alloc(ctx->fed_client->key_id),
                      "%s/fed-x509/%s", ctx->fed_client->tenancy_id, fingerprint(ctx->fed_client->leaf_cert_ret->cert));
-    flb_plg_info(ctx->ins, "fed client key_id = %s", ctx->fed_client->key_id);
+    // flb_plg_info(ctx->ins, "fed client key_id = %s", ctx->fed_client->key_id);
 
     // TODO: build headers
     u_conn = flb_upstream_conn_get(ctx->fed_u);
@@ -400,16 +400,17 @@ int refresh_security_token(struct flb_oci_logan *ctx,
     s_inter_cert = sanitize_certificate_string(ctx->fed_client->intermediate_cert_ret->cert_pem);
     // flb_plg_info(ctx->ins, "sanitized inter cert: %s", s_inter_cert);
     sz = strlen(s_leaf_cert) + strlen(s_pub_key) + strlen(s_inter_cert);
-    json = flb_malloc((sz + 500));
-    sprintf(json,OCI_FEDERATION_REQUEST_PAYLOAD,
-            s_leaf_cert,
-            s_pub_key,
-            s_inter_cert);
+    json = flb_sds_create_size(sz + 1000);
+    flb_sds_snprintf(&json, flb_sds_alloc(json),
+                     OCI_FEDERATION_REQUEST_PAYLOAD,
+                     s_leaf_cert,
+                     s_pub_key,
+                     s_inter_cert);
     // flb_plg_info(ctx->ins, "fed client payload = %s", json);
 
     fed_uri = flb_sds_create_len("/v1/x509", 8);
     c = flb_http_client(u_conn, FLB_HTTP_POST, fed_uri,
-                        json, strlen(json),
+                        json, flb_sds_len(json),
                         NULL, 0, NULL, 0);
     c->allow_dup_headers = FLB_FALSE;
 
@@ -430,7 +431,7 @@ int refresh_security_token(struct flb_oci_logan *ctx,
             flb_plg_error(ctx->ins, "http do error");
             flb_upstream_conn_release(u_conn);
             flb_http_client_destroy(c);
-            flb_free(json);
+            flb_sds_destroy(json);
             flb_free(fed_uri);
             flb_free(s_leaf_cert);
             flb_free(s_pub_key);
@@ -438,10 +439,11 @@ int refresh_security_token(struct flb_oci_logan *ctx,
             return -1;
         }
         if (c->resp.status != 200) {
-            flb_plg_error(ctx->ins, "http status = %d, response = %s", c->resp.status, c->resp.payload);
+            flb_plg_error(ctx->ins, "http status = %d, response = %s, header = %s",
+                          c->resp.status, c->resp.payload, c->header_buf);
             flb_upstream_conn_release(u_conn);
             flb_http_client_destroy(c);
-            flb_free(json);
+            flb_sds_destroy(json);
             flb_free(fed_uri);
             flb_free(s_leaf_cert);
             flb_free(s_pub_key);
@@ -461,7 +463,7 @@ int refresh_security_token(struct flb_oci_logan *ctx,
         flb_free(fed_uri);
         flb_upstream_conn_release(u_conn);
         flb_http_client_destroy(c);
-        flb_free(json);
+        flb_sds_destroy(json);
         return -1;
     }
     flb_upstream_conn_release(u_conn);
