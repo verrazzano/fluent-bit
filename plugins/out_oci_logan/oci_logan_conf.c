@@ -435,6 +435,7 @@ int refresh_security_token(struct flb_oci_logan *ctx,
         }
         ctx->fed_client->security_token = parse_token(c->resp.payload,
                                                       c->resp.payload_size);
+        flb_plg_info(ctx->ins, "security token = %s", ctx->fed_client->security_token);
 
     err = get_token_exp(ctx->fed_client->security_token, &ctx->fed_client->expire);
     if (err) {
@@ -707,8 +708,8 @@ struct flb_oci_logan *flb_oci_logan_conf_create(struct flb_output_instance *ins,
     if (strcmp(ctx->auth_type, INSTANCE_PRINCIPAL) == 0) {
         ctx->cert_u = flb_upstream_create(config, METADATA_HOST_BASE, 80, FLB_IO_TCP, NULL);
         refresh_security_token(ctx, config);
-        ctx->region = ctx->fed_client->region;
-        ctx->private_key = ctx->fed_client->private_key;
+        // ctx->region = ctx->fed_client->region;
+        // ctx->private_key = ctx->fed_client->private_key;
     }
 
     // TODO: fetch security token
@@ -792,10 +793,12 @@ struct flb_oci_logan *flb_oci_logan_conf_create(struct flb_output_instance *ins,
         flb_sds_snprintf(&ctx->key_id, flb_sds_alloc(ctx->key_id),
                          "%s/%s/%s", ctx->tenancy, ctx->user, ctx->key_fingerprint);
     }
+    /*
     else if (!strcasecmp(ctx->auth_type, INSTANCE_PRINCIPAL)) {
         flb_sds_snprintf(&ctx->key_id, flb_sds_alloc(ctx->key_id),
                          "ST$%s", ctx->fed_client->security_token);
     }
+     */
 
     /* Check if SSL/TLS is enabled */
     io_flags = FLB_IO_TCP;
