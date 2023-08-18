@@ -150,6 +150,35 @@ flb_sds_t create_authorization_header_content(flb_sds_t signature,
     return content;
 }
 
+flb_sds_t create_fed_authorization_header_content(flb_sds_t signature,
+                                              flb_sds_t key_id)
+{
+    flb_sds_t content;
+
+    content = flb_sds_create_size(512);
+    content = flb_sds_cat(content, FLB_OCI_SIGN_SIGNATURE_VERSION,
+                          sizeof(FLB_OCI_SIGN_SIGNATURE_VERSION) - 1);
+    content = flb_sds_cat(content, ",", 1);
+    content = flb_sds_cat(content, FLB_OCI_SIGN_KEYID,
+                          sizeof(FLB_OCI_SIGN_KEYID) - 1);
+    content = flb_sds_cat(content, "=\"", 2);
+    content = flb_sds_cat(content, key_id, flb_sds_len(key_id));
+    content = flb_sds_cat(content, "\",", 2);
+    content = flb_sds_cat(content, FLB_OCI_SIGN_ALGORITHM,
+                          sizeof(FLB_OCI_SIGN_ALGORITHM) - 1);
+    content = flb_sds_cat(content, ",", 1);
+    content = flb_sds_cat(content, FLB_OCI_FED_SIGN_HEADERS,
+                          sizeof(FLB_OCI_FED_SIGN_HEADERS) - 1);
+    content = flb_sds_cat(content, ",", 1);
+    content = flb_sds_cat(content, FLB_OCI_SIGN_SIGNATURE,
+                          sizeof(FLB_OCI_SIGN_SIGNATURE) - 1);
+    content = flb_sds_cat(content, "=\"", 2);
+    content = flb_sds_cat(content, signature, flb_sds_len(signature));
+    content = flb_sds_cat(content, "\"", 1);
+
+    return content;
+}
+
 flb_sds_t refresh_cert(struct flb_upstream *u,
                        flb_sds_t cert_url,
                        struct flb_output_instance *ins)

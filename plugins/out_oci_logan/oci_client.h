@@ -34,6 +34,12 @@
     FLB_OCI_HEADER_CONTENT_LENGTH "\""
 
 #define FLB_OCI_SIGN_SIGNATURE   "signature"
+#define FLB_OCI_FED_SIGN_HEADERS "headers=\"" \
+    FLB_OCI_HEADER_REQUEST_TARGET " " \
+    FLB_OCI_HEADER_DATE " " \
+    FLB_OCI_HEADER_X_CONTENT_SHA256 " " \
+    FLB_OCI_HEADER_CONTENT_TYPE " " \
+    FLB_OCI_HEADER_CONTENT_LENGTH "\""
 
 
 #endif //FLUENT_BIT_PLUGINS_OUT_OCI_LOGAN_OCI_CLIENT_H_
@@ -72,3 +78,5 @@ flb_sds_t create_authorization_header_content(flb_sds_t signature,
                                               flb_sds_t key_id);
 const char* get_token_exp(flb_sds_t token_string,
                           time_t *exp);
+flb_sds_t create_fed_authorization_header_content(flb_sds_t signature,
+                                                  flb_sds_t key_id)

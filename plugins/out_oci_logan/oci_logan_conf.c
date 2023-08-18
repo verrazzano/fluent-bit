@@ -263,7 +263,7 @@ static int build_federation_client_headers(struct flb_oci_logan *ctx,
         goto error_label;
     }
 
-    auth_header_str = create_authorization_header_content(signature, ctx->fed_client->key_id);
+    auth_header_str = create_fed_authorization_header_content(signature, ctx->fed_client->key_id);
     if (!auth_header_str) {
         flb_plg_error(ctx->ins, "cannot compose authorization header");
         goto error_label;
@@ -415,7 +415,7 @@ int refresh_security_token(struct flb_oci_logan *ctx,
     c->allow_dup_headers = FLB_FALSE;
 
     build_federation_client_headers(ctx, c, json, fed_uri);
-    /*
+
     mk_list_foreach_safe(head, tmp, &c->headers) {
         kv = mk_list_entry(head, struct flb_kv, _head);
         if (flb_sds_casecmp(kv->key, "host", 4) == 0) {
@@ -423,7 +423,6 @@ int refresh_security_token(struct flb_oci_logan *ctx,
             break;
         }
     }
-    */
 
 
     ret = flb_http_do(c, &b_sent);
