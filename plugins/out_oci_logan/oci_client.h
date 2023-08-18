@@ -79,4 +79,4 @@ flb_sds_t create_authorization_header_content(flb_sds_t signature,
 const char* get_token_exp(flb_sds_t token_string,
                           time_t *exp);
 flb_sds_t create_fed_authorization_header_content(flb_sds_t signature,
-                                                  flb_sds_t key_id)
+                                                  flb_sds_t key_id);
