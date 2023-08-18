@@ -416,6 +416,7 @@ int refresh_security_token(struct flb_oci_logan *ctx,
 
     build_federation_client_headers(ctx, c, json, fed_uri);
 
+    /*
     mk_list_foreach_safe(head, tmp, &c->headers) {
         kv = mk_list_entry(head, struct flb_kv, _head);
         if (flb_sds_casecmp(kv->key, "host", 4) == 0) {
@@ -423,6 +424,7 @@ int refresh_security_token(struct flb_oci_logan *ctx,
             break;
         }
     }
+     */
 
 
     ret = flb_http_do(c, &b_sent);
