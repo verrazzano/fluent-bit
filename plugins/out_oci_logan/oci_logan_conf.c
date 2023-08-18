@@ -181,7 +181,7 @@ static int build_federation_client_headers(struct flb_oci_logan *ctx,
     }
 
     // Add (requeset-target) to signing string
-    encoded_uri = flb_uri_encode(uri, flb_sds_len(uri));
+    encoded_uri = flb_uri_encode(uri, strlen(uri));
     if (!encoded_uri) {
         flb_errno();
         goto error_label;
@@ -310,6 +310,7 @@ int refresh_security_token(struct flb_oci_logan *ctx,
 {
     flb_sds_t region;
     flb_sds_t host;
+    flb_sds_t fed_uri;
     char* err;
     struct flb_upstream *upstream;
     struct flb_connection *u_conn;
@@ -389,25 +390,26 @@ int refresh_security_token(struct flb_oci_logan *ctx,
     }
 
     s_leaf_cert = sanitize_certificate_string(ctx->fed_client->leaf_cert_ret->cert_pem);
-    flb_plg_info(ctx->ins, "sanitized leaf cert: %s", s_leaf_cert);
+    // flb_plg_info(ctx->ins, "sanitized leaf cert: %s", s_leaf_cert);
     s_pub_key = sanitize_certificate_string(ctx->fed_client->public_key);
-    flb_plg_info(ctx->ins, "pub key: %s", s_pub_key);
+    // flb_plg_info(ctx->ins, "pub key: %s", s_pub_key);
     s_inter_cert = sanitize_certificate_string(ctx->fed_client->intermediate_cert_ret->cert_pem);
-    flb_plg_info(ctx->ins, "sanitized inter cert: %s", s_inter_cert);
+    // flb_plg_info(ctx->ins, "sanitized inter cert: %s", s_inter_cert);
     sz = strlen(s_leaf_cert) + strlen(s_pub_key) + strlen(s_inter_cert);
     json = flb_malloc((sz + 500));
     sprintf(json,OCI_FEDERATION_REQUEST_PAYLOAD,
             s_leaf_cert,
             s_pub_key,
             s_inter_cert);
-    flb_plg_info(ctx->ins, "fed client payload = %s", json);
+    // flb_plg_info(ctx->ins, "fed client payload = %s", json);
 
-    c = flb_http_client(u_conn, FLB_HTTP_POST, "v1/x509",
+    fed_uri = flb_sds_create_len("v1/x509", 7);
+    c = flb_http_client(u_conn, FLB_HTTP_POST, fed_uri,
                         json, strlen(json),
                         NULL, 0, NULL, 0);
     c->allow_dup_headers = FLB_FALSE;
 
-    build_federation_client_headers(ctx, c, json, "v1/x509");
+    build_federation_client_headers(ctx, c, json, fed_uri);
 
 
         ret = flb_http_do(c, &b_sent);
@@ -415,6 +417,7 @@ int refresh_security_token(struct flb_oci_logan *ctx,
             flb_upstream_conn_release(u_conn);
             flb_http_client_destroy(c);
             flb_free(json);
+            flb_free(fed_uri);
             flb_free(s_leaf_cert);
             flb_free(s_pub_key);
             flb_free(s_inter_cert);
@@ -424,6 +427,7 @@ int refresh_security_token(struct flb_oci_logan *ctx,
             flb_upstream_conn_release(u_conn);
             flb_http_client_destroy(c);
             flb_free(json);
+            flb_free(fed_uri);
             flb_free(s_leaf_cert);
             flb_free(s_pub_key);
             flb_free(s_inter_cert);
@@ -438,6 +442,7 @@ int refresh_security_token(struct flb_oci_logan *ctx,
         flb_free(s_leaf_cert);
         flb_free(s_pub_key);
         flb_free(s_inter_cert);
+        flb_free(fed_uri);
         flb_upstream_conn_release(u_conn);
         flb_http_client_destroy(c);
         flb_free(json);
@@ -446,6 +451,7 @@ int refresh_security_token(struct flb_oci_logan *ctx,
     flb_upstream_conn_release(u_conn);
     flb_http_client_destroy(c);
     flb_free(json);
+    flb_free(fed_uri);
     flb_free(s_leaf_cert);
     flb_free(s_pub_key);
     flb_free(s_inter_cert);
