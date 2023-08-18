@@ -126,7 +126,7 @@ flb_sds_t create_authorization_header_content(flb_sds_t signature,
 {
     flb_sds_t content;
 
-    content = flb_sds_create_size(512);
+    content = flb_sds_create_size(1024*10);
     content = flb_sds_cat(content, FLB_OCI_SIGN_SIGNATURE_VERSION,
                           sizeof(FLB_OCI_SIGN_SIGNATURE_VERSION) - 1);
     content = flb_sds_cat(content, ",", 1);
