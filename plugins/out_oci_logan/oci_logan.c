@@ -502,7 +502,6 @@ static int flush_to_endpoint(struct flb_oci_logan *ctx,
         goto error_label;
     }
     flb_plg_info(ctx->ins, "built request");
-    flb_plg_info(ctx->ins, "request header %s", c->header_buf);
 
     out_ret = FLB_OK;
 
@@ -514,6 +513,7 @@ static int flush_to_endpoint(struct flb_oci_logan *ctx,
         if (c->resp.status != 200) {
 
             out_ret = FLB_ERROR;
+            flb_plg_info(ctx->ins, "request header %s", c->header_buf);
 
             if (c->resp.payload && c->resp.payload_size > 0) {
                 if (retry_error(c, ctx) == FLB_TRUE) {
