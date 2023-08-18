@@ -1015,6 +1015,7 @@ static void cb_oci_logan_flush(struct flb_event_chunk *event_chunk,
     if (strcasecmp(ctx->auth_type, INSTANCE_PRINCIPAL) == 0) {
         ret = refresh_security_token(ctx, config);
         if (ret != 0) {
+            flb_errno();
             // flb_oci_logan_conf_destroy(ctx);
             FLB_OUTPUT_RETURN(FLB_RETRY);
         }

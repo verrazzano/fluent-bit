@@ -16,6 +16,7 @@
 #include <monkey/mk_core/mk_list.h>
 #include <monkey/mk_core/mk_string.h>
 #include <fluent-bit/flb_utils.h>
+#include <fluent-bit/flb_kv.h>
 
 #include "oci_logan.h"
 #include "oci_logan_conf.h"
@@ -315,6 +316,9 @@ int refresh_security_token(struct flb_oci_logan *ctx,
     struct flb_upstream *upstream;
     struct flb_connection *u_conn;
     struct flb_http_client *c;
+    struct flb_kv *kv;
+    struct mk_list *tmp;
+    struct mk_list *head;
     char *s_leaf_cert, *s_inter_cert, *s_pub_key;
     int ret = -1, sz;
     time_t now;
@@ -403,16 +407,25 @@ int refresh_security_token(struct flb_oci_logan *ctx,
             s_inter_cert);
     // flb_plg_info(ctx->ins, "fed client payload = %s", json);
 
-    fed_uri = flb_sds_create_len("v1/x509", 7);
+    fed_uri = flb_sds_create_len("/v1/x509", 8);
     c = flb_http_client(u_conn, FLB_HTTP_POST, fed_uri,
                         json, strlen(json),
                         NULL, 0, NULL, 0);
     c->allow_dup_headers = FLB_FALSE;
 
     build_federation_client_headers(ctx, c, json, fed_uri);
+    /*
+    mk_list_foreach_safe(head, tmp, &c->headers) {
+        kv = mk_list_entry(head, struct flb_kv, _head);
+        if (flb_sds_casecmp(kv->key, "host", 4) == 0) {
+            flb_kv_item_destroy(kv);
+            break;
+        }
+    }
+    */
 
 
-        ret = flb_http_do(c, &b_sent);
+    ret = flb_http_do(c, &b_sent);
         if (ret != 0) {
             flb_plg_error(ctx->ins, "http do error");
             flb_upstream_conn_release(u_conn);
@@ -709,12 +722,14 @@ struct flb_oci_logan *flb_oci_logan_conf_create(struct flb_output_instance *ins,
 
     if (strcmp(ctx->auth_type, INSTANCE_PRINCIPAL) == 0) {
         ctx->cert_u = flb_upstream_create(config, METADATA_HOST_BASE, 80, FLB_IO_TCP, NULL);
+        /*
         ret = refresh_security_token(ctx, config);
         if (ret != 0) {
             flb_errno();
             flb_oci_logan_conf_destroy(ctx);
             return NULL;
         }
+         */
         // ctx->region = ctx->fed_client->region;
         // ctx->private_key = ctx->fed_client->private_key;
     }
