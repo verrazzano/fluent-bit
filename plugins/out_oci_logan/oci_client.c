@@ -12,7 +12,7 @@
 #include <openssl/rsa.h>
 #include <openssl/sha.h>
 #include <openssl/pem.h>
-#include <jsmn/jsmn.h>
+#include <fluent-bit/flb_jsmn.h>
 
 flb_sds_t create_base64_sha256_signature(flb_sds_t private_key,
                                                 flb_sds_t signing_string)
