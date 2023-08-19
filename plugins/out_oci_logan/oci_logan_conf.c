@@ -366,13 +366,15 @@ int refresh_security_token(struct flb_oci_logan *ctx,
     ctx->fed_client->region = region;
     host = flb_sds_create_size(512);
     flb_sds_snprintf(&host, flb_sds_alloc(host), "auth.%s.oci.oraclecloud.com", region);
-    upstream = flb_upstream_create(config, host,  443,
-                                   FLB_IO_TLS, ctx->ins->tls);
-    if (!upstream) {
-        return -1;
-    }
+    if (!ctx->fed_u) {
+        upstream = flb_upstream_create(config, host, 443,
+                                       FLB_IO_TLS, ctx->ins->tls);
+        if (!upstream) {
+            return -1;
+        }
 
-    ctx->fed_u = upstream;
+        ctx->fed_u = upstream;
+    }
     ctx->fed_client->tenancy_id = get_tenancy_id_from_certificate(ctx->fed_client->leaf_cert_ret->cert);
     ret = session_key_supplier(&ctx->fed_client->private_key,
                          &ctx->fed_client->public_key,
@@ -532,6 +534,55 @@ static int create_pk_context(flb_sds_t filepath, const char *key_passphrase,
     flb_sds_len_set(kbuffer, finfo.size + 1);
 
     ctx->private_key = kbuffer;
+
+    return 0;
+}
+
+int refresh_oke_workload_security_token(struct flb_oci_logan *ctx,
+                                        struct flb_config *config)
+{
+    char* tmp, *host;
+    int port = 12250;
+    flb_sds_t sa_cert_path;
+    struct flb_tls *tls;
+    if (!ctx->fed_client) {
+        ctx->fed_client = flb_calloc(1, sizeof(struct federation_client));
+    }
+    tmp = getenv("OCI_KUBERNETES_SERVICE_ACCOUNT_CERT_PATH");
+    if (!tmp) {
+        tmp = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt\0";
+    }
+    sa_cert_path = flb_sds_create_len(tmp, strlen(tmp));
+    tmp = getenv("OCI_RESOURCE_PRINCIPAL_REGION");
+    if (!tmp) {
+        flb_plg_error(ctx->ins, "Not a valid region");
+        flb_sds_destroy(sa_cert_path);
+        return -1;
+    }
+    ctx->fed_client->region = flb_sds_create_len(tmp, strlen(tmp));
+    session_key_supplier(&ctx->fed_client->private_key,
+                         &ctx->fed_client->public_key,
+                         ctx->ins);
+    host = getenv("KUBERNETES_SERVICE_HOST");
+    if (!host) {
+        flb_plg_error(ctx->ins, "Host not found");
+        flb_sds_destroy(sa_cert_path);
+        return -1;
+    }
+    if (!ctx->fed_u) {
+        tls = flb_tls_create(FLB_TLS_CLIENT_MODE,
+                             0,
+                             1,
+                             NULL,
+                             NULL,
+                             sa_cert_path,
+                             NULL,
+                             NULL,
+                             NULL);
+        ctx->fed_u = flb_upstream_create(config, host, port, FLB_IO_TLS, tls);
+    }
+
+    // Make the request and fetch the security token
 
     return 0;
 }
