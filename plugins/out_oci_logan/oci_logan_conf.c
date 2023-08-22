@@ -432,25 +432,25 @@ int refresh_security_token(struct flb_oci_logan *ctx,
     ret = flb_http_do(c, &b_sent);
         if (ret != 0) {
             flb_plg_error(ctx->ins, "http do error");
-            flb_upstream_conn_release(u_conn);
-            flb_http_client_destroy(c);
             flb_sds_destroy(json);
             flb_free(fed_uri);
             flb_free(s_leaf_cert);
             flb_free(s_pub_key);
             flb_free(s_inter_cert);
+            flb_http_client_destroy(c);
+            flb_upstream_conn_release(u_conn);
             return -1;
         }
         if (c->resp.status != 200) {
             flb_plg_error(ctx->ins, "http status = %d, response = %s, header = %s",
                           c->resp.status, c->resp.payload, c->header_buf);
-            flb_upstream_conn_release(u_conn);
-            flb_http_client_destroy(c);
             flb_sds_destroy(json);
             flb_free(fed_uri);
             flb_free(s_leaf_cert);
             flb_free(s_pub_key);
             flb_free(s_inter_cert);
+            flb_http_client_destroy(c);
+            flb_upstream_conn_release(u_conn);
             return -1;
         }
         ctx->fed_client->security_token = parse_token(c->resp.payload,
@@ -464,18 +464,18 @@ int refresh_security_token(struct flb_oci_logan *ctx,
         flb_free(s_pub_key);
         flb_free(s_inter_cert);
         flb_free(fed_uri);
-        flb_upstream_conn_release(u_conn);
-        flb_http_client_destroy(c);
         flb_sds_destroy(json);
+        flb_http_client_destroy(c);
+        flb_upstream_conn_release(u_conn);
         return -1;
     }
-    flb_upstream_conn_release(u_conn);
-    flb_http_client_destroy(c);
     flb_free(json);
     flb_free(fed_uri);
     flb_free(s_leaf_cert);
     flb_free(s_pub_key);
     flb_free(s_inter_cert);
+    flb_http_client_destroy(c);
+    flb_upstream_conn_release(u_conn);
     return 0;
 
 }
@@ -542,17 +542,27 @@ int refresh_oke_workload_security_token(struct flb_oci_logan *ctx,
                                         struct flb_config *config)
 {
     char* tmp, *host;
-    int port = 12250;
+    const char* err = NULL;
+    char buf[1024*8] = {0};
+    size_t o_len;
+    int port = 12250, ret;
     flb_sds_t sa_cert_path;
     struct flb_tls *tls;
+    struct flb_http_client *c;
+    struct flb_connection *u_conn;
+    flb_sds_t auth_header;
+    flb_sds_t token;
+    flb_sds_t json;
+    flb_sds_t uri;
+    size_t b_sent;
     if (!ctx->fed_client) {
         ctx->fed_client = flb_calloc(1, sizeof(struct federation_client));
     }
     tmp = getenv("OCI_KUBERNETES_SERVICE_ACCOUNT_CERT_PATH");
     if (!tmp) {
-        tmp = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt\0";
+        tmp = FLB_OKE_DEFAULT_SA_CERT_PATH;
     }
-    sa_cert_path = flb_sds_create_len(tmp, strlen(tmp));
+    sa_cert_path = flb_sds_create_len(tmp, sizeof(tmp) - 1);
     tmp = getenv("OCI_RESOURCE_PRINCIPAL_REGION");
     if (!tmp) {
         flb_plg_error(ctx->ins, "Not a valid region");
@@ -582,7 +592,93 @@ int refresh_oke_workload_security_token(struct flb_oci_logan *ctx,
         ctx->fed_u = flb_upstream_create(config, host, port, FLB_IO_TLS, tls);
     }
 
+    token = flb_file_read(FLB_OKE_TOKEN_PATH);
+    if (!token) {
+        flb_errno();
+        flb_plg_error(ctx->ins, "failed to load kubernetes service account token");
+        flb_sds_destroy(sa_cert_path);
+        return -1;
+    }
+
+    json = flb_sds_create_size(1024*4);
+    flb_sds_snprintf(&json, flb_sds_alloc(json),
+                     OCI_OKE_PROXYMUX_PAYLOAD, ctx->fed_client->public_key);
+    uri = flb_sds_create_len("/resourcePrincipalSessionTokens",
+                             sizeof("/resourcePrincipalSessionTokens") - 1);
+
+    u_conn = flb_upstream_conn_get(ctx->fed_u);
+    if (!u_conn) {
+        flb_errno();
+        flb_plg_error(ctx->ins,
+                      "failed to establish connection with kubernetes upstream");
+        flb_sds_destroy(sa_cert_path);
+        return -1;
+    }
+    c = flb_http_client(u_conn, FLB_HTTP_POST, uri, json, flb_sds_len(json), NULL, 0, NULL, 0);
+    if (!c) {
+        flb_errno();
+        flb_plg_error(ctx->ins,
+                      "failed to create http client");
+        flb_upstream_conn_release(u_conn);
+        flb_sds_destroy(sa_cert_path);
+        return -1;
+    }
+    auth_header = flb_sds_create_size(512);
+    flb_sds_snprintf(&auth_header, flb_sds_alloc(auth_header), "Bearer %s", token);
+    flb_http_add_header(c, FLB_OCI_HEADER_AUTH,
+                        sizeof(FLB_OCI_HEADER_AUTH) - 1,
+                        auth_header,
+                        strlen(auth_header));
+    flb_http_add_header(c, FLB_OCI_HEADER_USER_AGENT,
+                        sizeof(FLB_OCI_HEADER_USER_AGENT) - 1,
+                        "Fluent-Bit", 10);
+    flb_http_add_header(c, FLB_OCI_HEADER_CONTENT_TYPE,
+                        sizeof(FLB_OCI_HEADER_CONTENT_TYPE) - 1,
+                        FLB_OCI_HEADER_CONTENT_TYPE_FED_VAL,
+                        sizeof(FLB_OCI_HEADER_CONTENT_TYPE_FED_VAL) - 1);
+    ret = flb_http_do(c, &b_sent);
+    if (ret != 0) {
+        flb_plg_error(ctx->ins, "http do error");
+        flb_sds_destroy(sa_cert_path);
+        flb_http_client_destroy(c);
+        flb_upstream_conn_release(u_conn);
+        return -1;
+    }
+    if (c->resp.status != 200) {
+        flb_plg_error(ctx->ins,
+                      "HTTP Status = %d, payload = %s",
+                      c->resp.status, c->resp.payload);
+        flb_sds_destroy(sa_cert_path);
+        flb_http_client_destroy(c);
+        flb_upstream_conn_release(u_conn);
+        return -1;
+    }
+
+    c->resp.payload++;
+    c->resp.payload[strlen(c->resp.payload) - 1] = '\0';
+    flb_base64_decode((unsigned char*)buf,
+                      sizeof(buf),
+                      &o_len,
+                      (unsigned char*) c->resp.payload,
+                      strlen(c->resp.payload));
+    ctx->key_id = parse_token(buf, strlen(buf));
+    err = get_token_exp(ctx->key_id + 3, &ctx->fed_client->expire);
+
+    if (err != NULL) {
+        flb_plg_error(ctx->ins,
+                      "failed to extract token expiration time");
+        flb_sds_destroy(sa_cert_path);
+        flb_http_client_destroy(c);
+        flb_upstream_conn_release(u_conn);
+        return -1;
+    }
+    flb_plg_info(ctx->ins, "token expiration time = %ld", ctx->fed_client->expire);
+    // decode jwt token stored in buf
     // Make the request and fetch the security token
+
+    flb_sds_destroy(sa_cert_path);
+    flb_http_client_destroy(c);
+    flb_upstream_conn_release(u_conn);
 
     return 0;
 }
@@ -774,7 +870,7 @@ struct flb_oci_logan *flb_oci_logan_conf_create(struct flb_output_instance *ins,
 
     build_region_table(ctx);
 
-    if (strcmp(ctx->auth_type, INSTANCE_PRINCIPAL) == 0) {
+    if (strcasecmp(ctx->auth_type, INSTANCE_PRINCIPAL) == 0) {
         ctx->cert_u = flb_upstream_create(config, METADATA_HOST_BASE, 80, FLB_IO_TCP, NULL);
         /*
         ret = refresh_security_token(ctx, config);

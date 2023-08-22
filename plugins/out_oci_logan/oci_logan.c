@@ -1023,6 +1023,15 @@ static void cb_oci_logan_flush(struct flb_event_chunk *event_chunk,
         flb_sds_snprintf(&ctx->key_id, flb_sds_alloc(ctx->key_id),
                          "ST$%s", ctx->fed_client->security_token);
     }
+    if (strcasecmp(ctx->auth_type, WORKLOAD_IDENTITY) == 0) {
+        ret = refresh_oke_workload_security_token(ctx, config);
+        if (ret != 0) {
+            flb_errno();
+            flb_plg_error(ctx->ins,
+                          "failed to refresh RPST token from proxymux endpoint");
+            FLB_OUTPUT_RETURN(FLB_RETRY);
+        }
+    }
 
     ret = total_flush(event_chunk, out_flush,
                       ins, out_context,

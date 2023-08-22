@@ -294,6 +294,9 @@ RegionEUJovanovac1: "oc20",
 #define USER_PRINCIPAL                                 "user_principal"
 #define WORKLOAD_IDENTITY                              "workload_identity"
 
+#define FLB_OKE_DEFAULT_SA_CERT_PATH  "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+#define FLB_OKE_TOKEN_PATH  "/var/run/secrets/kubernetes.io/serviceaccount/token"
+
 /* For OCI signing */
 #define FLB_OCI_PARAM_TENANCY     "tenancy"
 #define FLB_OCI_PARAM_USER        "user"
@@ -315,6 +318,7 @@ RegionEUJovanovac1: "oc20",
 #define FLB_OCI_ERROR_CODE_INTERNAL_SERVER_ERROR           "InternalServerError"
 
 #define OCI_FEDERATION_REQUEST_PAYLOAD            "{\"certificate\":\"%s\",\"publicKey\":\"%s\", \"intermediateCertificates\":[\"%s\"]}"
+#define OCI_OKE_PROXYMUX_PAYLOAD                  "{\"podKey\":\"%s\"}"
 
 #define METADATA_HOST_BASE "169.254.169.254"
 #define GET_REGION_URL  "/opc/v2/instance/region"
