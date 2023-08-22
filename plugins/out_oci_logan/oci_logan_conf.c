@@ -563,6 +563,7 @@ int refresh_oke_workload_security_token(struct flb_oci_logan *ctx,
         tmp = FLB_OKE_DEFAULT_SA_CERT_PATH;
     }
     sa_cert_path = flb_sds_create_len(tmp, sizeof(tmp) - 1);
+    /*
     tmp = getenv("OCI_RESOURCE_PRINCIPAL_REGION");
     if (!tmp) {
         flb_plg_error(ctx->ins, "Not a valid region");
@@ -570,6 +571,7 @@ int refresh_oke_workload_security_token(struct flb_oci_logan *ctx,
         return -1;
     }
     ctx->fed_client->region = flb_sds_create_len(tmp, strlen(tmp));
+     */
     session_key_supplier(&ctx->fed_client->private_key,
                          &ctx->fed_client->public_key,
                          ctx->ins);

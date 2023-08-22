@@ -1031,6 +1031,7 @@ static void cb_oci_logan_flush(struct flb_event_chunk *event_chunk,
                           "failed to refresh RPST token from proxymux endpoint");
             FLB_OUTPUT_RETURN(FLB_RETRY);
         }
+        ctx->private_key = ctx->fed_client->private_key;
     }
 
     ret = total_flush(event_chunk, out_flush,
@@ -1139,6 +1140,24 @@ static struct flb_config_map config_map[] = {
         0, FLB_TRUE, offsetof(struct flb_oci_logan, auth_type),
             "authentication type of the plugin"
     },
+    {
+        FLB_CONFIG_MAP_STR, "region", NULL,
+        0, FLB_TRUE, offsetof(struct flb_oci_logan, region),
+            "OCI region. This field is only applicable for workload identity authentication"
+    },
+    {
+        FLB_CONFIG_MAP_STR, "oke_sa_ca_file", FLB_OKE_DEFAULT_SA_CERT_PATH,
+        0, FLB_TRUE, offsetof(struct flb_oci_logan, oke_sa_ca_file),
+        "Kubernetes TLS CA file"
+    },
+
+    /* Kubernetes Token file */
+    {
+        FLB_CONFIG_MAP_STR, "oke_sa_token_file", FLB_OKE_TOKEN_PATH,
+        0, FLB_TRUE, offsetof(struct flb_oci_logan, oke_sa_token_file),
+        "Kubernetes authorization token file"
+    },
+
 
     {0}
 };

@@ -421,6 +421,8 @@ struct flb_oci_logan {
     /* For OCI signing */
     flb_sds_t key_id; // tenancy/user/key_fingerprint
     flb_sds_t private_key;
+    flb_sds_t oke_sa_ca_file;
+    flb_sds_t oke_sa_token_file;
 
     struct federation_client *fed_client;
 
