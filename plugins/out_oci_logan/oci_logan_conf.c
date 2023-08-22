@@ -629,6 +629,7 @@ int refresh_oke_workload_security_token(struct flb_oci_logan *ctx,
                         sizeof(FLB_OCI_HEADER_CONTENT_TYPE) - 1,
                         FLB_OCI_HEADER_CONTENT_TYPE_FED_VAL,
                         sizeof(FLB_OCI_HEADER_CONTENT_TYPE_FED_VAL) - 1);
+    flb_http_add_header(c, "Accept", 6, "*/*", 3);
     ret = flb_http_do(c, &b_sent);
     if (ret != 0) {
         flb_plg_error(ctx->ins, "http do error");
@@ -637,6 +638,8 @@ int refresh_oke_workload_security_token(struct flb_oci_logan *ctx,
         return -1;
     }
     if (c->resp.status != 200) {
+        flb_plg_info(ctx->ins, "request body = %s", json);
+        flb_plg_info(ctx->ins, "request header = %s", c->header_buf);
         flb_plg_error(ctx->ins,
                       "HTTP Status = %d, payload = %s",
                       c->resp.status, c->resp.payload);
