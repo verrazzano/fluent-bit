@@ -538,6 +538,48 @@ static int create_pk_context(flb_sds_t filepath, const char *key_passphrase,
     return 0;
 }
 
+static int file_to_buffer(const char *path,
+                          char **out_buf, size_t *out_size)
+{
+    int ret;
+    char *buf;
+    ssize_t bytes;
+    FILE *fp;
+    struct stat st;
+
+    if (!(fp = fopen(path, "r"))) {
+        return -1;
+    }
+
+    ret = stat(path, &st);
+    if (ret == -1) {
+        flb_errno();
+        fclose(fp);
+        return -1;
+    }
+
+    buf = flb_calloc(1, (st.st_size + 1));
+    if (!buf) {
+        flb_errno();
+        fclose(fp);
+        return -1;
+    }
+
+    bytes = fread(buf, st.st_size, 1, fp);
+    if (bytes < 1) {
+        flb_free(buf);
+        fclose(fp);
+        return -1;
+    }
+
+    fclose(fp);
+
+    *out_buf = buf;
+    *out_size = st.st_size;
+
+    return 0;
+}
+
 int refresh_oke_workload_security_token(struct flb_oci_logan *ctx,
                                         struct flb_config *config)
 {
@@ -550,7 +592,8 @@ int refresh_oke_workload_security_token(struct flb_oci_logan *ctx,
     struct flb_http_client *c;
     struct flb_connection *u_conn;
     flb_sds_t auth_header;
-    flb_sds_t token;
+    char *token = NULL;
+    size_t tk_size;
     flb_sds_t json;
     flb_sds_t uri;
     size_t b_sent;
@@ -588,8 +631,8 @@ int refresh_oke_workload_security_token(struct flb_oci_logan *ctx,
         ctx->fed_u = flb_upstream_create(config, host, port, FLB_IO_TLS, tls);
     }
 
-    token = flb_file_read(ctx->oke_sa_token_file);
-    if (!token) {
+    ret = file_to_buffer(ctx->oke_sa_token_file, &token, &tk_size);
+    if (ret != 0) {
         flb_errno();
         flb_plg_error(ctx->ins, "failed to load kubernetes service account token");
         return -1;
@@ -617,12 +660,12 @@ int refresh_oke_workload_security_token(struct flb_oci_logan *ctx,
         flb_upstream_conn_release(u_conn);
         return -1;
     }
-    auth_header = flb_sds_create_size(512);
-    flb_sds_snprintf(&auth_header, flb_sds_alloc(auth_header), "Bearer %s", token);
+    auth_header = flb_sds_create_size(1024*4);
+    ret = flb_sds_snprintf(&auth_header, flb_sds_alloc(auth_header), "Bearer %s", token);
     flb_http_add_header(c, FLB_OCI_HEADER_AUTH,
                         sizeof(FLB_OCI_HEADER_AUTH) - 1,
                         auth_header,
-                        strlen(auth_header));
+                        ret);
     flb_http_add_header(c, FLB_OCI_HEADER_USER_AGENT,
                         sizeof(FLB_OCI_HEADER_USER_AGENT) - 1,
                         "Fluent-Bit", 10);
