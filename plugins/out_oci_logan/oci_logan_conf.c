@@ -546,7 +546,6 @@ int refresh_oke_workload_security_token(struct flb_oci_logan *ctx,
     char buf[1024*8] = {0};
     size_t o_len;
     int port = 12250, ret;
-    flb_sds_t sa_cert_path;
     struct flb_tls *tls;
     struct flb_http_client *c;
     struct flb_connection *u_conn;
@@ -558,11 +557,7 @@ int refresh_oke_workload_security_token(struct flb_oci_logan *ctx,
     if (!ctx->fed_client) {
         ctx->fed_client = flb_calloc(1, sizeof(struct federation_client));
     }
-    tmp = getenv("OCI_KUBERNETES_SERVICE_ACCOUNT_CERT_PATH");
-    if (!tmp) {
-        tmp = FLB_OKE_DEFAULT_SA_CERT_PATH;
-    }
-    sa_cert_path = flb_sds_create_len(tmp, sizeof(tmp) - 1);
+
     /*
     tmp = getenv("OCI_RESOURCE_PRINCIPAL_REGION");
     if (!tmp) {
@@ -578,7 +573,6 @@ int refresh_oke_workload_security_token(struct flb_oci_logan *ctx,
     host = getenv("KUBERNETES_SERVICE_HOST");
     if (!host) {
         flb_plg_error(ctx->ins, "Host not found");
-        flb_sds_destroy(sa_cert_path);
         return -1;
     }
     if (!ctx->fed_u) {
@@ -587,18 +581,17 @@ int refresh_oke_workload_security_token(struct flb_oci_logan *ctx,
                              1,
                              NULL,
                              NULL,
-                             sa_cert_path,
+                             ctx->oke_sa_ca_file,
                              NULL,
                              NULL,
                              NULL);
         ctx->fed_u = flb_upstream_create(config, host, port, FLB_IO_TLS, tls);
     }
 
-    token = flb_file_read(FLB_OKE_TOKEN_PATH);
+    token = flb_file_read(ctx->oke_sa_token_file);
     if (!token) {
         flb_errno();
         flb_plg_error(ctx->ins, "failed to load kubernetes service account token");
-        flb_sds_destroy(sa_cert_path);
         return -1;
     }
 
@@ -613,7 +606,6 @@ int refresh_oke_workload_security_token(struct flb_oci_logan *ctx,
         flb_errno();
         flb_plg_error(ctx->ins,
                       "failed to establish connection with kubernetes upstream");
-        flb_sds_destroy(sa_cert_path);
         return -1;
     }
     c = flb_http_client(u_conn, FLB_HTTP_POST, uri, json, flb_sds_len(json), NULL, 0, NULL, 0);
@@ -622,7 +614,6 @@ int refresh_oke_workload_security_token(struct flb_oci_logan *ctx,
         flb_plg_error(ctx->ins,
                       "failed to create http client");
         flb_upstream_conn_release(u_conn);
-        flb_sds_destroy(sa_cert_path);
         return -1;
     }
     auth_header = flb_sds_create_size(512);
@@ -641,7 +632,6 @@ int refresh_oke_workload_security_token(struct flb_oci_logan *ctx,
     ret = flb_http_do(c, &b_sent);
     if (ret != 0) {
         flb_plg_error(ctx->ins, "http do error");
-        flb_sds_destroy(sa_cert_path);
         flb_http_client_destroy(c);
         flb_upstream_conn_release(u_conn);
         return -1;
@@ -650,7 +640,6 @@ int refresh_oke_workload_security_token(struct flb_oci_logan *ctx,
         flb_plg_error(ctx->ins,
                       "HTTP Status = %d, payload = %s",
                       c->resp.status, c->resp.payload);
-        flb_sds_destroy(sa_cert_path);
         flb_http_client_destroy(c);
         flb_upstream_conn_release(u_conn);
         return -1;
@@ -669,7 +658,6 @@ int refresh_oke_workload_security_token(struct flb_oci_logan *ctx,
     if (err != NULL) {
         flb_plg_error(ctx->ins,
                       "failed to extract token expiration time");
-        flb_sds_destroy(sa_cert_path);
         flb_http_client_destroy(c);
         flb_upstream_conn_release(u_conn);
         return -1;
@@ -678,7 +666,6 @@ int refresh_oke_workload_security_token(struct flb_oci_logan *ctx,
     // decode jwt token stored in buf
     // Make the request and fetch the security token
 
-    flb_sds_destroy(sa_cert_path);
     flb_http_client_destroy(c);
     flb_upstream_conn_release(u_conn);
 
