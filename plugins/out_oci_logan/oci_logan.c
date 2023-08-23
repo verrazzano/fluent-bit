@@ -43,6 +43,7 @@ static int build_headers(struct flb_http_client *c, struct flb_oci_logan *ctx,
 {
     int ret = -1;
     flb_sds_t tmp_sds = NULL;
+    flb_sds_t tmp_sds_1 = NULL;
     flb_sds_t signing_str = NULL;
     flb_sds_t rfc1123date = NULL;
     flb_sds_t encoded_uri = NULL;
@@ -117,6 +118,7 @@ static int build_headers(struct flb_http_client *c, struct flb_oci_logan *ctx,
         goto error_label;
     }
 
+    tmp_sds_1 = flb_sds_create_size(1024);
     // Add x-content-sha256 Header
     ret = flb_hash_simple(FLB_HASH_SHA256,
                           (unsigned char*) json,
@@ -128,16 +130,16 @@ static int build_headers(struct flb_http_client *c, struct flb_oci_logan *ctx,
         goto error_label;
     }
 
-    flb_base64_encode((unsigned char*) tmp_sds, flb_sds_len(tmp_sds) - 1,
+    flb_base64_encode((unsigned char*) tmp_sds_1, flb_sds_len(tmp_sds_1) - 1,
                       &tmp_len, sha256_buf, sizeof(sha256_buf));
 
-    tmp_sds[tmp_len] = '\0';
-    flb_sds_len_set(tmp_sds, tmp_len);
+    tmp_sds_1[tmp_len] = '\0';
+    flb_sds_len_set(tmp_sds_1, tmp_len);
 
     signing_str = add_header_and_signing(c, signing_str,
                                          FLB_OCI_HEADER_X_CONTENT_SHA256,
-                                         sizeof(FLB_OCI_HEADER_X_CONTENT_SHA256) - 1, tmp_sds,
-                                         flb_sds_len(tmp_sds));
+                                         sizeof(FLB_OCI_HEADER_X_CONTENT_SHA256) - 1, tmp_sds_1,
+                                         flb_sds_len(tmp_sds_1));
     if (!signing_str) {
         flb_plg_error(ctx->ins, "cannot compose signing string");
         goto error_label;
@@ -195,6 +197,9 @@ static int build_headers(struct flb_http_client *c, struct flb_oci_logan *ctx,
     error_label:
     if (tmp_sds) {
         flb_sds_destroy(tmp_sds);
+    }
+    if (tmp_sds_1) {
+        flb_sds_destroy(tmp_sds_1);
     }
     if (signing_str) {
         flb_sds_destroy(signing_str);
@@ -979,6 +984,10 @@ static int total_flush(struct flb_event_chunk *event_chunk,
 
     flb_plg_info(ctx->ins, "payload=%s", out_buf);
     flb_plg_info(ctx->ins, "lg_id=%s", log_group_id);
+    if (out_buf == NULL) {
+        res = 0;
+        goto clean_up;
+    }
 
     ret = flush_to_endpoint(ctx, out_buf, log_group_id, log_set_id);
     if(ret != FLB_OK) {
