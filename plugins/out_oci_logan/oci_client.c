@@ -367,7 +367,7 @@ int session_key_supplier(flb_sds_t *priv_key,
     // Serialize to string
     pri = BIO_new(BIO_s_mem());
     pub = BIO_new(BIO_s_mem());
-    PEM_write_bio_PrivateKey(pri, key, NULL, NULL, 0, 0, NULL);
+    PEM_write_bio_RSAPrivateKey(pri, (const RSA *) key, NULL, NULL, 0, 0, NULL);
     PEM_write_bio_PUBKEY(pub, key);
 
     priKeyLen = BIO_pending(pri);
@@ -378,8 +378,8 @@ int session_key_supplier(flb_sds_t *priv_key,
     BIO_read(pub, pubKeyStr, pubKeyLen);
     priKeyStr[priKeyLen] = '\0';
     pubKeyStr[pubKeyLen] = '\0';
-    // flb_plg_info(ins, "private_key = %s", priKeyStr);
-    // flb_plg_info(ins, "pub_key = %s", pubKeyStr);
+    flb_plg_info(ins, "private_key = %s", priKeyStr);
+    flb_plg_info(ins, "pub_key = %s", pubKeyStr);
 
     *priv_key = flb_sds_create_len((const char *) priKeyStr, priKeyLen);
     *pub_key = flb_sds_create_len((const char *)pubKeyStr, pubKeyLen);
