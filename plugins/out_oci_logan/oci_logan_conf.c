@@ -641,7 +641,7 @@ int refresh_oke_workload_security_token(struct flb_oci_logan *ctx,
     char *s_pub_key = sanitize_certificate_string(ctx->fed_client->public_key);
     json = flb_sds_create_size(1024*4);
     flb_sds_snprintf(&json, flb_sds_alloc(json),
-                     OCI_OKE_PROXYMUX_PAYLOAD, ctx->fed_client->public_key);
+                     OCI_OKE_PROXYMUX_PAYLOAD, s_pub_key);
     uri = flb_sds_create_len("/resourcePrincipalSessionTokens",
                              sizeof("/resourcePrincipalSessionTokens") - 1);
 
