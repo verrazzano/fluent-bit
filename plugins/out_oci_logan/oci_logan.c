@@ -962,11 +962,16 @@ static int total_flush(struct flb_event_chunk *event_chunk,
             }
         }
         if (log >= 0) {
-            msgpack_pack_object(&mp_pck, map.via.map.ptr[log].val);
+            msgpack_pack_str(&mp_pck, map.via.map.ptr[log].val.via.str.size);
+            msgpack_pack_str_body(&mp_pck, map.via.map.ptr[log].val.via.str.ptr,
+                                  map.via.map.ptr[log].val.via.str.size);
         }
         else if (msg >= 0) {
-            msgpack_pack_object(&mp_pck, map.via.map.ptr[msg].val);
+            msgpack_pack_str(&mp_pck, map.via.map.ptr[msg].val.via.str.size);
+            msgpack_pack_str_body(&mp_pck, map.via.map.ptr[msg].val.via.str.ptr,
+                                  map.via.map.ptr[msg].val.via.str.size);
         }
+
         log = -1;
         msg = -1;
     }
