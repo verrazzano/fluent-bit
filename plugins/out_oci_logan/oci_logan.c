@@ -525,10 +525,10 @@ static int flush_to_endpoint(struct flb_oci_logan *ctx,
                     out_ret = FLB_RETRY;
                 }
 
-                flb_plg_error(ctx->ins, "%s:%i, retry=%s, HTTP status=%i\n%s",
+                flb_plg_error(ctx->ins, "%s:%i, retry=%s, HTTP status=%i\n%s,\nbody=%s",
                               ctx->ins->host.name, ctx->ins->host.port,
                               (out_ret == FLB_RETRY ? "true" : "false"),
-                              c->resp.status, c->resp.payload);
+                              c->resp.status, c->resp.payload, payload);
             }
             else {
                 flb_plg_error(ctx->ins, "%s:%i, retry=%s, HTTP status=%i",
@@ -987,8 +987,8 @@ static int total_flush(struct flb_event_chunk *event_chunk,
     msgpack_sbuffer_destroy(&mp_sbuf);
     flb_log_event_decoder_destroy(&log_decoder);
 
-    flb_plg_info(ctx->ins, "payload=%s", out_buf);
-    flb_plg_info(ctx->ins, "lg_id=%s", log_group_id);
+    // flb_plg_info(ctx->ins, "payload=%s", out_buf);
+    // flb_plg_info(ctx->ins, "lg_id=%s", log_group_id);
     if (out_buf == NULL) {
         res = 0;
         goto clean_up;
