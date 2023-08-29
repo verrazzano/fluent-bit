@@ -597,6 +597,15 @@ int refresh_oke_workload_security_token(struct flb_oci_logan *ctx,
     flb_sds_t json;
     flb_sds_t uri;
     size_t b_sent;
+    time_t now;
+
+    if (ctx->fed_client && ctx->fed_client->expire) {
+        now = time(NULL);
+        if (ctx->fed_client->expire > now) {
+            return 0;
+        }
+    }
+
     if (!ctx->fed_client) {
         ctx->fed_client = flb_calloc(1, sizeof(struct federation_client));
     }
