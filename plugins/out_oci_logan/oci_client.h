@@ -77,6 +77,7 @@ flb_sds_t create_base64_sha256_signature(flb_sds_t private_key,
 flb_sds_t create_authorization_header_content(flb_sds_t signature,
                                               flb_sds_t key_id);
 const char* get_token_exp(flb_sds_t token_string,
-                          time_t *exp);
+                          time_t *exp,
+                          struct flb_output_instance *ins);
 flb_sds_t create_fed_authorization_header_content(flb_sds_t signature,
                                                   flb_sds_t key_id);

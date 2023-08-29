@@ -378,8 +378,8 @@ int session_key_supplier(flb_sds_t *priv_key,
     BIO_read(pub, pubKeyStr, pubKeyLen);
     priKeyStr[priKeyLen] = '\0';
     pubKeyStr[pubKeyLen] = '\0';
-    flb_plg_info(ins, "private_key = %s", priKeyStr);
-    flb_plg_info(ins, "pub_key = %s", pubKeyStr);
+    // flb_plg_info(ins, "private_key = %s", priKeyStr);
+    // flb_plg_info(ins, "pub_key = %s", pubKeyStr);
 
     *priv_key = flb_sds_create_len((const char *) priKeyStr, priKeyLen);
     *pub_key = flb_sds_create_len((const char *)pubKeyStr, pubKeyLen);
@@ -610,12 +610,14 @@ static const char *jwt_decode_payload(const char *src,
 }
 
 const char* get_token_exp(flb_sds_t token_string,
-                          time_t *exp)
+                          time_t *exp,
+                          struct flb_output_instance *ins)
 {
     char *payload = NULL;
     const char* err_str = NULL;
 
     err_str = jwt_decode_payload(token_string, &payload);
+    flb_plg_info(ins, "jwt payload = %s", payload);
 
     if (err_str != NULL) {
         return err_str;
@@ -675,6 +677,7 @@ const char* get_token_exp(flb_sds_t token_string,
             && strncasecmp(key, "exp",
                            3) == 0) {
             // code
+            flb_plg_info(ins, "fetched exp time = %s", val);
             *exp = atol(val);
             break;
         }

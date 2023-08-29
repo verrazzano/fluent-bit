@@ -457,7 +457,7 @@ int refresh_security_token(struct flb_oci_logan *ctx,
                                                       c->resp.payload_size);
         flb_plg_info(ctx->ins, "security token = %s", ctx->fed_client->security_token);
 
-    err = get_token_exp(ctx->fed_client->security_token, &ctx->fed_client->expire);
+    err = get_token_exp(ctx->fed_client->security_token, &ctx->fed_client->expire, ctx->ins);
     if (err) {
         flb_plg_error(ctx->ins, "token error = %s",err);
         flb_free(s_leaf_cert);
@@ -700,7 +700,7 @@ int refresh_oke_workload_security_token(struct flb_oci_logan *ctx,
                       (unsigned char*) c->resp.payload,
                       strlen(c->resp.payload));
     ctx->key_id = parse_token(buf, strlen(buf));
-    err = get_token_exp(ctx->key_id + 3, &ctx->fed_client->expire);
+    err = get_token_exp(ctx->key_id + 3, &ctx->fed_client->expire, ctx->ins);
 
     if (err != NULL) {
         flb_plg_error(ctx->ins,
