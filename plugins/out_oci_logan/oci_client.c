@@ -623,7 +623,7 @@ const char* get_token_exp(flb_sds_t token_string,
         return err_str;
     }
 
-    int tok_size = 32, ret, i;
+    int tok_size = 256, ret, i;
     jsmn_parser parser;
     jsmntok_t *t;
     jsmntok_t *tokens;
@@ -673,6 +673,7 @@ const char* get_token_exp(flb_sds_t token_string,
             continue;
         }
 
+        flb_plg_info(ins, "sectoken %s: %s", key, val);
         if ((key_len == 3)
             && strncasecmp(key, "exp",
                            3) == 0) {
