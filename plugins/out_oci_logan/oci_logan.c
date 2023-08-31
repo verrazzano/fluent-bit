@@ -180,6 +180,8 @@ static int build_headers(struct flb_http_client *c, struct flb_oci_logan *ctx,
         goto error_label;
     }
 
+    flb_plg_info(ctx->ins, "auth header str = %s", auth_header_str);
+
     flb_http_add_header(c, FLB_OCI_HEADER_AUTH, sizeof(FLB_OCI_HEADER_AUTH) - 1,
                         auth_header_str, flb_sds_len(auth_header_str));
 

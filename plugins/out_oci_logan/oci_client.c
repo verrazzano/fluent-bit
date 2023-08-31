@@ -617,7 +617,7 @@ const char* get_token_exp(flb_sds_t token_string,
     const char* err_str = NULL;
 
     err_str = jwt_decode_payload(token_string, &payload);
-    flb_plg_info(ins, "jwt payload = %s", payload);
+    // flb_plg_info(ins, "jwt payload = %s", payload);
 
     if (err_str != NULL) {
         return err_str;
@@ -673,7 +673,7 @@ const char* get_token_exp(flb_sds_t token_string,
             continue;
         }
 
-        flb_plg_info(ins, "sectoken %s: %s", key, val);
+        // flb_plg_info(ins, "sectoken %s: %s", key, val);
         if ((key_len == 3)
             && strncasecmp(key, "exp",
                            3) == 0) {
