@@ -1006,7 +1006,7 @@ struct flb_oci_logan *flb_oci_logan_conf_create(struct flb_output_instance *ins,
 
 
 
-    ctx->key_id = flb_sds_create_size(512);
+    ctx->key_id = flb_sds_create_size(512*8);
     if (!strcasecmp(ctx->auth_type, USER_PRINCIPAL)) {
         flb_sds_snprintf(&ctx->key_id, flb_sds_alloc(ctx->key_id),
                          "%s/%s/%s", ctx->tenancy, ctx->user, ctx->key_fingerprint);
