@@ -167,12 +167,15 @@ static int build_headers(struct flb_http_client *c, struct flb_oci_logan *ctx,
         goto error_label;
     }
 
+    flb_plg_info(ctx->ins, "signing str = %s", signing_str);
     // Add Authorization header
     signature = create_base64_sha256_signature(ctx->private_key, signing_str);
     if (!signature) {
         flb_plg_error(ctx->ins, "cannot compose signing signature");
         goto error_label;
     }
+
+    flb_plg_info(ctx->ins, "signature = %s", signature);
 
     auth_header_str = create_authorization_header_content( signature, ctx->key_id);
     if (!auth_header_str) {
@@ -1036,6 +1039,7 @@ static void cb_oci_logan_flush(struct flb_event_chunk *event_chunk,
             FLB_OUTPUT_RETURN(FLB_RETRY);
         }
         ctx->private_key = ctx->fed_client->private_key;
+        ctx->region = ctx->fed_client->region;
         flb_sds_snprintf(&ctx->key_id, flb_sds_alloc(ctx->key_id),
                          "ST$%s", ctx->fed_client->security_token);
     }

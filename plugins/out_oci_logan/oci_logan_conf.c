@@ -469,6 +469,7 @@ int refresh_security_token(struct flb_oci_logan *ctx,
         flb_upstream_conn_release(u_conn);
         return -1;
     }
+    flb_plg_info(ctx->ins, "token expiration time = %ld", ctx->fed_client->expire);
     flb_free(json);
     flb_free(fed_uri);
     flb_free(s_leaf_cert);
