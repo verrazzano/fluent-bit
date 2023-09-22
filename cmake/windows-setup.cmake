@@ -36,6 +36,7 @@ if(FLB_WINDOWS_DEFAULTS)
   set(FLB_IN_HEALTH              No)
   set(FLB_IN_HTTP               Yes)
   set(FLB_IN_MEM                 No)
+  set(FLB_IN_KAFKA               No)
   set(FLB_IN_KMSG                No)
   set(FLB_IN_LIB                Yes)
   set(FLB_IN_RANDOM             Yes)
@@ -61,6 +62,7 @@ if(FLB_WINDOWS_DEFAULTS)
   set(FLB_IN_ELASTICSEARCH      Yes)
   # disable calyptia fleet management for now
   set(FLB_IN_CALYPTIA_FLEET     No)
+  set(FLB_IN_SPLUNK             Yes)
 
   # OUTPUT plugins
   # ==============
