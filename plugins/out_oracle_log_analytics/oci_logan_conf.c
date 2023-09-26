@@ -935,6 +935,8 @@ int set_upstream_ctx(struct flb_oci_logan *ctx,
         flb_sds_snprintf(&host, flb_sds_alloc(host), "loganalytics.%s.oci.oraclecloud.com", ctx->region);
     }
 
+    flb_plg_info(ins, "host = %s", host);
+
     io_flags = FLB_IO_TCP;
     default_port = 80;
 
@@ -951,6 +953,8 @@ int set_upstream_ctx(struct flb_oci_logan *ctx,
 
     flb_output_net_default(host, default_port, ins);
     flb_sds_destroy(host);
+
+    flb_plg_info(ins, "ins.host.name = %s", ins->host.name);
 
     if (ctx->proxy) {
         ret = flb_utils_url_split(tmp, &protocol, &p_host, &p_port, &p_uri);
