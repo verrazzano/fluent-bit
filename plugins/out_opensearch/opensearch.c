@@ -518,18 +518,6 @@ static int opensearch_format(struct flb_config *config,
         msgpack_pack_str_body(&tmp_pck, time_formatted, s);
 
         index = ctx->index;
-<<<<<<< HEAD
-        if (ctx->logstash_format == FLB_TRUE) {
-            ret = compose_index_header(ctx, index_custom_len,
-                                       &logstash_index[0], sizeof(logstash_index),
-                                       ctx->logstash_prefix_separator, &tm);
-            if (ret < 0) {
-                /* retry with default separator */
-                compose_index_header(ctx, index_custom_len,
-                                     &logstash_index[0], sizeof(logstash_index),
-                                     "-", &tm);
-=======
-
         if (ctx->data_stream_mode == FLB_TRUE) {
             index = ctx->data_stream_name;
             if (ctx->ra_data_stream) {
@@ -544,11 +532,14 @@ static int opensearch_format(struct flb_config *config,
             }
         }
         else if (ctx->logstash_format == FLB_TRUE) {
-            /* Compose Index header */
-            if (index_custom_len > 0) {
-                p = logstash_index + index_custom_len;
-
->>>>>>> 3bff26487 (add support for opensearch data stream (#2))
+            ret = compose_index_header(ctx, index_custom_len,
+                                       &logstash_index[0], sizeof(logstash_index),
+                                       ctx->logstash_prefix_separator, &tm);
+            if (ret < 0) {
+                /* retry with default separator */
+                compose_index_header(ctx, index_custom_len,
+                                     &logstash_index[0], sizeof(logstash_index),
+                                     "-", &tm);
             }
             index = logstash_index;
             if (ctx->generate_id == FLB_FALSE) {
@@ -558,8 +549,7 @@ static int opensearch_format(struct flb_config *config,
                                                  OS_BULK_INDEX_FMT_NO_TYPE,
                                                  ctx->action,
                                                  index);
-                }
-                else {
+                } else {
                     index_len = flb_sds_snprintf(&j_index,
                                                  flb_sds_alloc(j_index),
                                                  OS_BULK_INDEX_FMT,
