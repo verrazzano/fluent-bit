@@ -256,6 +256,7 @@ option(FLB_OUT_S3                      "Enable AWS S3 output plugin"            
 option(FLB_OUT_VIVO_EXPORTER           "Enabel Vivo exporter output plugin"           Yes)
 option(FLB_OUT_WEBSOCKET               "Enable Websocket output plugin"               Yes)
 option(FLB_OUT_ORACLE_LOG_ANALYTICS    "Enable Oracle Cloud Infrastructure Logging analytics plugin"          Yes)
+option(FLB_OUT_ORACLE_LOGGING          "Enable Oracle Cloud Infrastructure Logging plugin"                    Yes)
 option(FLB_OUT_CHRONICLE               "Enable Google Chronicle output plugin"        Yes)
 option(FLB_FILTER_ALTER_SIZE           "Enable alter_size filter"                     Yes)
 option(FLB_FILTER_AWS                  "Enable aws filter"                            Yes)
