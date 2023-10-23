@@ -313,6 +313,8 @@ endif()
 # Proxy interfaces
 add_subdirectory(proxy)
 
+add_subdirectory(oracle)
+
 set(FLB_PROXY_PLUGINS "")
 if(FLB_PROXY_GO)
   set(FLB_PROXY_PLUGINS ${FLB_PROXY_PLUGINS} flb-plugin-proxy-go)

@@ -6,6 +6,7 @@
 #include <fluent-bit/flb_config.h>
 #include <fluent-bit/flb_output_plugin.h>
 #include <fluent-bit/flb_utils.h>
+#include <fluent-bit/oracle/flb_oracle_client.h>
 #include "oci_logging_conf.h"
 #include "oci_logging.h"
 
@@ -46,7 +47,10 @@ struct flb_oci_logging *flb_oci_logging_conf_create(struct flb_output_instance *
     }
 
     // move out to common location
-    ret = load_oci_credentials(ctx);
+    ret = load_oci_credentials(ctx->ins, ctx->config_file_location,
+                               ctx->profile_name, &ctx->user,
+                               &ctx->tenancy, &ctx->key_file,
+                               &ctx->key_fingerprint, &ctx->region);
     if(ret != 0) {
         flb_errno();
         flb_oci_logging_conf_destroy(ctx);
@@ -76,7 +80,7 @@ struct flb_oci_logging *flb_oci_logging_conf_create(struct flb_output_instance *
 
 
     // move out to common location
-    if (create_pk_context(ctx->key_file, NULL, ctx) < 0) {
+    if (create_pk_context(ctx->key_file, NULL, ctx->ins, &ctx->private_key) < 0) {
         flb_plg_error(ctx->ins, "failed to create pk context");
         flb_oci_logging_conf_destroy(ctx);
         return NULL;
