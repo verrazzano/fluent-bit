@@ -5,6 +5,7 @@
 #include <fluent-bit/flb_output_plugin.h>
 #include <fluent-bit/flb_log_event_decoder.h>
 #include <fluent-bit/flb_pack.h>
+#include <fluent-bit/oracle/flb_oracle_client.h>
 #include "oci_logging.h"
 #include "oci_logging_conf.h"
 
@@ -127,6 +128,73 @@ static int cb_oci_logging_init(struct flb_output_instance *ins,
     return 0;
 }
 
+static int flush_to_endpoint(struct flb_oci_logging *ctx,
+                             flb_sds_t payload)
+{
+    struct flb_connection *u_conn;
+    struct flb_http_client *c;
+    int out_ret, http_ret;
+    size_t b_sent;
+    u_conn = flb_upstream_conn_get(ctx->u);
+    if(!u_conn) {
+        goto error_label;
+    }
+    /* Create HTTP client context */
+    c = flb_http_client(u_conn, FLB_HTTP_POST, ctx->uri, (void*) payload,
+                        flb_sds_len(payload), ctx->ins->host.name, ctx->ins->host.port, ctx->proxy, 0);
+    if (!c) {
+        goto error_label;
+    }
+    flb_http_allow_duplicated_headers(c, FLB_FALSE);
+
+    flb_plg_debug(ctx->ins, "built client");
+    flb_http_buffer_size(c, FLB_HTTP_DATA_SIZE_MAX);
+    if (build_headers(c, ctx->private_key, ctx->key_id,
+                      payload,
+                      ctx->ins->host.name,
+                      ctx->ins->host.port,
+                      ctx->uri, ctx->ins) < 0) {
+        flb_plg_error(ctx->ins, "failed to build headers");
+        goto error_label;
+    }
+    flb_plg_debug(ctx->ins, "built request");
+
+    out_ret = FLB_OK;
+
+    http_ret = flb_http_do(c, &b_sent);
+    flb_plg_debug(ctx->ins, "placed request");
+
+    if (http_ret == 0) {
+        if (c->resp.status != 200) {
+            flb_plg_debug(ctx->ins, "request header %s", c->header_buf);
+            out_ret = FLB_RETRY;
+            flb_plg_error(ctx->ins, "could not flush records to %s:%i (http_do=%i), retry=%s",
+                          ctx->ins->host.name, ctx->ins->host.port,
+                          http_ret, (out_ret == FLB_RETRY ? "true" : "false"));
+        }
+    }
+    else {
+        out_ret = FLB_RETRY;
+        flb_plg_error(ctx->ins, "could not flush records to %s:%i (http_do=%i), retry=%s",
+                      ctx->ins->host.name, ctx->ins->host.port,
+                      http_ret, (out_ret == FLB_RETRY ? "true" : "false"));
+        goto error_label;
+    }
+
+    error_label:
+    /* Destroy HTTP client context */
+    if (c) {
+        flb_http_client_destroy(c);
+    }
+
+    /* Release the TCP connection */
+    if (u_conn) {
+        flb_upstream_conn_release(u_conn);
+    }
+
+    return out_ret;
+}
+
 static void cb_oci_logging_flush(struct flb_event_chunk *event_chunk,
                                struct flb_output_flush *out_flush,
                                struct flb_input_instance *ins, void *out_context,
@@ -142,7 +210,7 @@ static void cb_oci_logging_flush(struct flb_event_chunk *event_chunk,
     msgpack_sbuffer mp_sbuf, tmp_sbuf;
     msgpack_packer mp_pck, tmp_pck;
     struct msgpack_object_kv tmp;
-    int ret = 0, i;
+    int ret = 0, i, flush_ret = FLB_RETRY;
     flb_sds_t rec_data;
 
     num_records = flb_mp_count(event_chunk->data, event_chunk->size);
@@ -227,11 +295,17 @@ static void cb_oci_logging_flush(struct flb_event_chunk *event_chunk,
     flb_log_event_decoder_destroy(&log_decoder);
 
     // TODO: flush data
+    ret = flush_to_endpoint(ctx, out_buf);
+
+    if (ret == FLB_OK) {
+        flb_plg_debug(ctx->ins, "success");
+    }
 
 clean_up:
     if (out_buf != NULL) {
         flb_sds_destroy(out_buf);
     }
+    FLB_OUTPUT_RETURN(ret);
 }
 
 static int cb_oci_logging_exit(void *data, struct flb_config *config)
