@@ -6,6 +6,7 @@
 #include <fluent-bit/flb_log_event_decoder.h>
 #include <fluent-bit/flb_pack.h>
 #include <fluent-bit/oracle/flb_oracle_client.h>
+#include <fluent-bit/flb_utils.h>
 #include "oci_logging.h"
 #include "oci_logging_conf.h"
 
@@ -40,6 +41,7 @@ static int format_data(msgpack_object *data, flb_sds_t *out_buf)
     new_obj->obj = data;
     new_obj->cur_index = 0;
     new_obj->flattened_key = NULL;
+    new_obj->pop = FLB_TRUE;
     mk_list_add(&new_obj->_head, &stack);
 
     while (mk_list_is_empty(&stack) == -1) {
@@ -53,6 +55,7 @@ static int format_data(msgpack_object *data, flb_sds_t *out_buf)
                 child = flb_calloc(1, sizeof(struct nested));
                 child->obj = &cur->obj->via.map.ptr[i].val;
                 child->cur_index = 0;
+                child->pop = FLB_TRUE;
                 if (cur->flattened_key != NULL) {
                     flb_sds_snprintf(&child->flattened_key,
                                      sizeof(child->flattened_key),
@@ -65,7 +68,7 @@ static int format_data(msgpack_object *data, flb_sds_t *out_buf)
                 }
                 mk_list_add(&child->_head, &stack);
                 cur->cur_index = i + 1;
-                pop = FLB_FALSE;
+                cur->pop = FLB_FALSE;
                 break;
             }
             else {
@@ -89,7 +92,7 @@ static int format_data(msgpack_object *data, flb_sds_t *out_buf)
                 mk_list_add(&item->_head, &data_list);
             }
         }
-        if (pop == FLB_TRUE) {
+        if (cur->pop == FLB_TRUE) {
             mk_list_del(&cur->_head);
             flb_free(cur);
         }
@@ -212,6 +215,11 @@ static void cb_oci_logging_flush(struct flb_event_chunk *event_chunk,
     struct msgpack_object_kv tmp;
     int ret = 0, i, flush_ret = FLB_RETRY;
     flb_sds_t rec_data;
+    size_t s;
+    char time_formatted[255];
+    struct tm tm;
+    int len, include_time = 0;
+    char uuid[40] = {0};
 
     num_records = flb_mp_count(event_chunk->data, event_chunk->size);
     ret = flb_log_event_decoder_init(&log_decoder, (char *) event_chunk->data, event_chunk->size);
@@ -237,50 +245,82 @@ static void cb_oci_logging_flush(struct flb_event_chunk *event_chunk,
     msgpack_pack_str(&mp_pck, FLB_OCI_LOG_ENTRY_BATCHES_SIZE);
     msgpack_pack_str_body(&mp_pck, FLB_OCI_LOG_ENTRY_BATCHES, FLB_OCI_LOG_ENTRY_BATCHES_SIZE);
 
-    msgpack_pack_array(&mp_pck, num_records);
+    msgpack_pack_array(&mp_pck, 1);
     msgpack_pack_map(&mp_pck, 5);
+
+    msgpack_pack_str(&mp_pck, 6);
+    msgpack_pack_str_body(&mp_pck, "source", 6);
+
+    msgpack_pack_str(&mp_pck, 4);
+    msgpack_pack_str_body(&mp_pck, "test", 4);
+
+    msgpack_pack_str(&mp_pck, 4);
+    msgpack_pack_str_body(&mp_pck, "type", 4);
+
+    msgpack_pack_str(&mp_pck, 10);
+    msgpack_pack_str_body(&mp_pck, "sampleType", 10);
+
+    /*
+    msgpack_pack_str(&mp_pck, 7);
+    msgpack_pack_str_body(&mp_pck, "subject", 7);
+
+    msgpack_pack_str(&mp_pck, 4);
+    msgpack_pack_str_body(&mp_pck, "test", 4);
+     */
 
     while ((ret = flb_log_event_decoder_next(
         &log_decoder,
         &log_event)) == FLB_EVENT_DECODER_SUCCESS) {
         map = *log_event.body;
-        map_size = map.via.map.size;
-        msgpack_pack_map(&mp_pck, 5);
 
-        msgpack_pack_str(&mp_pck, 6);
-        msgpack_pack_str_body(&mp_pck, "source", 6);
+        if (!include_time) {
+            msgpack_pack_str(&mp_pck, FLB_DEFAULT_LOG_ENTRY_TIME_SIZE);
+            msgpack_pack_str_body(&mp_pck, FLB_DEFAULT_LOG_ENTRY_TIME, FLB_DEFAULT_LOG_ENTRY_TIME_SIZE);
 
-        // TODO: pack source
+            gmtime_r(&log_event.timestamp.tm.tv_sec, &tm);
+            s = strftime(time_formatted, sizeof(time_formatted) - 1,
+                         FLB_STD_TIME_FMT, &tm);
+            len = snprintf(time_formatted + s, sizeof(time_formatted) - 1 - s,
+                           ".%03" PRIu64 "Z",
+                           (uint64_t) log_event.timestamp.tm.tv_nsec);
+            s += len;
 
-        msgpack_pack_str(&mp_pck, 4);
-        msgpack_pack_str_body(&mp_pck, "type", 4);
+            msgpack_pack_str(&mp_pck, s);
+            msgpack_pack_str_body(&mp_pck, time_formatted, s);
 
-        // TODO: pack type
+            msgpack_pack_str(&mp_pck, 7);
+            msgpack_pack_str_body(&mp_pck, "entries", 7);
 
-        msgpack_pack_str(&mp_pck, 7);
-        msgpack_pack_str_body(&mp_pck, "subject", 7);
-
-        // TODO: pack subject
-
-        msgpack_pack_str(&mp_pck, FLB_DEFAULT_LOG_ENTRY_TIME_SIZE);
-        msgpack_pack_str_body(&mp_pck, FLB_DEFAULT_LOG_ENTRY_TIME, FLB_DEFAULT_LOG_ENTRY_TIME_SIZE);
-
-        // TODO: pack time
-
-        msgpack_pack_str(&mp_pck, 7);
-        msgpack_pack_str_body(&mp_pck, "entries", 7);
-
-        msgpack_pack_array(&mp_pck, 3);
+            msgpack_pack_array(&mp_pck, num_records);
+            include_time = 1;
+        }
+        msgpack_pack_map(&mp_pck, 3);
 
         msgpack_pack_str(&mp_pck, 2);
         msgpack_pack_str_body(&mp_pck, "id", 2);
 
+        memset(&uuid[0], 0, sizeof(uuid));
+        flb_utils_uuid_v4_gen(&uuid[0]);
+
         // TODO: pack id
+
+        msgpack_pack_str(&mp_pck, strlen(uuid));
+        msgpack_pack_str_body(&mp_pck, &uuid[0], strlen(&uuid[0]));
 
         msgpack_pack_str(&mp_pck, 4);
         msgpack_pack_str_body(&mp_pck, "time", 4);
 
-        // TODO: pack time
+        gmtime_r(&log_event.timestamp.tm.tv_sec, &tm);
+        s = strftime(time_formatted, sizeof(time_formatted) - 1,
+                     FLB_STD_TIME_FMT, &tm);
+        len = snprintf(time_formatted + s, sizeof(time_formatted) - 1 - s,
+                       ".%03" PRIu64 "Z",
+                       (uint64_t) log_event.timestamp.tm.tv_nsec);
+        s += len;
+
+        msgpack_pack_str(&mp_pck, s);
+        msgpack_pack_str_body(&mp_pck, time_formatted, s);
+
 
         msgpack_pack_str(&mp_pck, 4);
         msgpack_pack_str_body(&mp_pck, "data", 4);

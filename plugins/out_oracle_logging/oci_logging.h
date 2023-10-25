@@ -13,12 +13,14 @@
 
 #define FLB_DEFAULT_LOG_ENTRY_TIME "defaultlogentrytime"
 #define FLB_DEFAULT_LOG_ENTRY_TIME_SIZE sizeof(FLB_DEFAULT_LOG_ENTRY_TIME) - 1
+#define FLB_STD_TIME_FMT  "%Y-%m-%dT%H:%M:%S"
 #include <fluent-bit/flb_sds.h>
 
 struct nested {
     msgpack_object *obj;
     flb_sds_t flattened_key;
     int cur_index;
+    int pop;
     struct mk_list _head;
 };
 
