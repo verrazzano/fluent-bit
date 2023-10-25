@@ -15,7 +15,7 @@
  * The data string will be a json formatted string, with nested values such as '{"key1":{"key2":val}}'
  * will turn into '{"key1.key2":val}'.
  */
-static int format_data(msgpack_object *data, flb_sds_t *out_buf)
+static int format_data(msgpack_object *data, flb_sds_t *out_buf, struct flb_oci_logging *ctx)
 {
     int ret;
     struct mk_list stack, data_list;
@@ -41,7 +41,6 @@ static int format_data(msgpack_object *data, flb_sds_t *out_buf)
     new_obj->obj = data;
     new_obj->cur_index = 0;
     new_obj->flattened_key = NULL;
-    new_obj->pop = FLB_TRUE;
     mk_list_add(&new_obj->_head, &stack);
 
     while (mk_list_is_empty(&stack) == -1) {
@@ -55,8 +54,8 @@ static int format_data(msgpack_object *data, flb_sds_t *out_buf)
                 child = flb_calloc(1, sizeof(struct nested));
                 child->obj = &cur->obj->via.map.ptr[i].val;
                 child->cur_index = 0;
-                child->pop = FLB_TRUE;
                 if (cur->flattened_key != NULL) {
+                    child->flattened_key = flb_sds_create_size(256);
                     flb_sds_snprintf(&child->flattened_key,
                                      sizeof(child->flattened_key),
                                      "%s.%s", cur->flattened_key,
@@ -68,7 +67,7 @@ static int format_data(msgpack_object *data, flb_sds_t *out_buf)
                 }
                 mk_list_add(&child->_head, &stack);
                 cur->cur_index = i + 1;
-                cur->pop = FLB_FALSE;
+                pop = FLB_FALSE;
                 break;
             }
             else {
@@ -77,8 +76,10 @@ static int format_data(msgpack_object *data, flb_sds_t *out_buf)
                    strcmp(cur->obj->via.map.ptr[i].key.via.str.ptr, "msg") == 0 ||
                    strcmp(cur->obj->via.map.ptr[i].key.via.str.ptr, "message") == 0) {
                     item->key = flb_sds_create_len("msg", 3);
+                    flb_plg_info(ctx->ins, "item_key = %s", item->key);
                 }
                 else if (cur->flattened_key != NULL) {
+                    item->key = flb_sds_create_size(256);
                     flb_sds_snprintf(&item->key,
                                      sizeof(item->key),
                                      "%s.%s", cur->flattened_key,
@@ -88,11 +89,12 @@ static int format_data(msgpack_object *data, flb_sds_t *out_buf)
                     item->key = flb_sds_create_len(cur->obj->via.map.ptr[i].key.via.str.ptr,
                                                    cur->obj->via.map.ptr[i].key.via.str.size);
                 }
+                flb_plg_info(ctx->ins, "item_key = %s", item->key);
                 item->val = &cur->obj->via.map.ptr[i].val;
                 mk_list_add(&item->_head, &data_list);
             }
         }
-        if (cur->pop == FLB_TRUE) {
+        if (pop == FLB_TRUE) {
             mk_list_del(&cur->_head);
             flb_free(cur);
         }
@@ -169,7 +171,7 @@ static int flush_to_endpoint(struct flb_oci_logging *ctx,
 
     if (http_ret == 0) {
         if (c->resp.status != 200) {
-            flb_plg_debug(ctx->ins, "request header %s", c->header_buf);
+            flb_plg_info(ctx->ins, "request header %s", c->header_buf);
             out_ret = FLB_RETRY;
             flb_plg_error(ctx->ins, "could not flush records to %s:%i (http_do=%i), retry=%s",
                           ctx->ins->host.name, ctx->ins->host.port,
@@ -246,7 +248,7 @@ static void cb_oci_logging_flush(struct flb_event_chunk *event_chunk,
     msgpack_pack_str_body(&mp_pck, FLB_OCI_LOG_ENTRY_BATCHES, FLB_OCI_LOG_ENTRY_BATCHES_SIZE);
 
     msgpack_pack_array(&mp_pck, 1);
-    msgpack_pack_map(&mp_pck, 5);
+    msgpack_pack_map(&mp_pck, 4);
 
     msgpack_pack_str(&mp_pck, 6);
     msgpack_pack_str_body(&mp_pck, "source", 6);
@@ -325,7 +327,8 @@ static void cb_oci_logging_flush(struct flb_event_chunk *event_chunk,
         msgpack_pack_str(&mp_pck, 4);
         msgpack_pack_str_body(&mp_pck, "data", 4);
 
-        format_data(&map, &rec_data);
+        format_data(&map, &rec_data, ctx);
+        flb_plg_info(ctx->ins, "record: %s", rec_data);
         msgpack_pack_str(&mp_pck, flb_sds_len(rec_data));
         msgpack_pack_str_body(&mp_pck, rec_data, flb_sds_len(rec_data));
     }
@@ -333,6 +336,8 @@ static void cb_oci_logging_flush(struct flb_event_chunk *event_chunk,
     out_buf = flb_msgpack_raw_to_json_sds(mp_sbuf.data, mp_sbuf.size);
     msgpack_sbuffer_destroy(&mp_sbuf);
     flb_log_event_decoder_destroy(&log_decoder);
+
+    flb_plg_info(ctx->ins, "payload = %s", out_buf);
 
     // TODO: flush data
     ret = flush_to_endpoint(ctx, out_buf);
@@ -356,7 +361,26 @@ static int cb_oci_logging_exit(void *data, struct flb_config *config)
 }
 
 /* Configuration properties map */
-static struct flb_config_map config_map[] = {};
+static struct flb_config_map config_map[] = {
+    {
+        FLB_CONFIG_MAP_STR, "config_file_location", "",
+        0, FLB_TRUE, offsetof(struct flb_oci_logging, config_file_location),
+        "Location of the oci config file for user api key signing"
+    },
+    {
+        FLB_CONFIG_MAP_STR, "log_group_id", "",
+        0, FLB_TRUE, offsetof(struct flb_oci_logging, log_group_id),
+        "Location of the oci config file for user api key signing"
+    },
+    {
+        FLB_CONFIG_MAP_STR, "profile_name", "",
+        0, FLB_TRUE, offsetof(struct flb_oci_logging, profile_name),
+        "Location of the oci config file for user api key signing"
+    },
+
+    {0}
+
+};
 /* Plugin reference */
 struct flb_output_plugin out_oracle_logging_plugin = {
     .name           = "oracle_logging",
@@ -375,5 +399,5 @@ struct flb_output_plugin out_oracle_logging_plugin = {
 
     /* Plugin flags */
     .flags          = FLB_OUTPUT_NET | FLB_IO_OPT_TLS,
-    .workers = 1,
+    .workers = 0,
 };

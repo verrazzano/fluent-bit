@@ -78,6 +78,7 @@ set(src
   flb_log_event_encoder_dynamic_field.c
   flb_processor.c
   flb_reload.c
+  "oracle/flb_oracle_client.c"
   )
 
 # Config format
@@ -312,8 +313,6 @@ endif()
 
 # Proxy interfaces
 add_subdirectory(proxy)
-
-add_subdirectory(oracle)
 
 set(FLB_PROXY_PLUGINS "")
 if(FLB_PROXY_GO)

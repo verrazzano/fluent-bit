@@ -152,5 +152,37 @@ struct flb_oci_logging *flb_oci_logging_conf_create(struct flb_output_instance *
 
 int flb_oci_logging_conf_destroy(struct flb_oci_logging *ctx)
 {
+    if(ctx == NULL) {
+        return 0;
+    }
+
+    if (ctx->private_key) {
+        flb_sds_destroy(ctx->private_key);
+    }
+    if (ctx->uri) {
+        flb_sds_destroy(ctx->uri);
+    }
+    if (ctx->key_id) {
+        flb_sds_destroy(ctx->key_id);
+    }
+    if (ctx->key_file) {
+        flb_sds_destroy(ctx->key_file);
+    }
+    if(ctx->user) {
+        flb_sds_destroy(ctx->user);
+    }
+    if(ctx->key_fingerprint) {
+        flb_sds_destroy(ctx->key_fingerprint);
+    }
+    if(ctx->tenancy) {
+        flb_sds_destroy(ctx->tenancy);
+    }
+    if(ctx->region) {
+        flb_sds_destroy(ctx->region);
+    }
+    if (ctx->u) {
+        flb_upstream_destroy(ctx->u);
+    }
+    flb_free(ctx);
     return 0;
 }
