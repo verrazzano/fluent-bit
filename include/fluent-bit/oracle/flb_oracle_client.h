@@ -10,7 +10,7 @@
 #define FLB_OCI_HEADER_USER_AGENT                      "User-Agent"
 #define FLB_OCI_HEADER_USER_AGENT_VAL                  "Fluent-Bit"
 #define FLB_OCI_HEADER_CONTENT_TYPE                    "content-type"
-#define FLB_OCI_HEADER_CONTENT_TYPE_VAL                "application/octet-stream"
+#define FLB_OCI_HEADER_CONTENT_TYPE_VAL                "application/json"
 #define FLB_OCI_HEADER_X_CONTENT_SHA256                "x-content-sha256"
 #define FLB_OCI_HEADER_CONTENT_LENGTH                  "content-length"
 #define FLB_OCI_HEADER_HOST                            "host"

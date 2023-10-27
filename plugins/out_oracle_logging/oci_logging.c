@@ -27,6 +27,7 @@ static int format_data(msgpack_object *data, flb_sds_t *out_buf, struct flb_oci_
     struct mk_list *head;
     struct mk_list *tmp;
     int i, pop, data_size;
+    flb_sds_t temp;
 
     msgpack_sbuffer data_sbuf;
     msgpack_packer data_pck;
@@ -38,7 +39,7 @@ static int format_data(msgpack_object *data, flb_sds_t *out_buf, struct flb_oci_
 
     new_obj = flb_calloc(1, sizeof(struct nested));
 
-    new_obj->obj = data;
+    new_obj->obj = *data;
     new_obj->cur_index = 0;
     new_obj->flattened_key = NULL;
     mk_list_add(&new_obj->_head, &stack);
@@ -46,24 +47,28 @@ static int format_data(msgpack_object *data, flb_sds_t *out_buf, struct flb_oci_
     while (mk_list_is_empty(&stack) == -1) {
         cur = mk_list_entry_last(&stack, struct nested, _head);
         pop = FLB_TRUE;
-        for (i = cur->cur_index; i < cur->obj->via.map.size; i++) {
-            if(cur->obj->via.map.ptr[i].key.type != MSGPACK_OBJECT_STR) {
+        for (i = cur->cur_index; i < cur->obj.via.map.size; i++) {
+            if(cur->obj.via.map.ptr[i].key.type != MSGPACK_OBJECT_STR) {
                 continue;
             }
-            if(cur->obj->via.map.ptr[i].val.type == MSGPACK_OBJECT_MAP) {
+            if(cur->obj.via.map.ptr[i].val.type == MSGPACK_OBJECT_MAP) {
                 child = flb_calloc(1, sizeof(struct nested));
-                child->obj = &cur->obj->via.map.ptr[i].val;
+                child->obj = cur->obj.via.map.ptr[i].val;
                 child->cur_index = 0;
                 if (cur->flattened_key != NULL) {
-                    child->flattened_key = flb_sds_create_size(256);
+                    temp = flb_sds_create_len(cur->obj.via.map.ptr[i].key.via.str.ptr,
+                                              cur->obj.via.map.ptr[i].key.via.str.size);
+                    child->flattened_key = flb_sds_create_size(flb_sds_len(temp) +
+                        flb_sds_len(cur->flattened_key) + 2);
                     flb_sds_snprintf(&child->flattened_key,
-                                     sizeof(child->flattened_key),
+                                     flb_sds_alloc(child->flattened_key),
                                      "%s.%s", cur->flattened_key,
-                                     cur->obj->via.map.ptr[i].key.via.str.ptr);
+                                     temp);
+                    flb_sds_destroy(temp);
                 }
                 else {
-                    child->flattened_key = flb_sds_create_len(cur->obj->via.map.ptr[i].key.via.str.ptr,
-                                                              cur->obj->via.map.ptr[i].key.via.str.size);
+                    child->flattened_key = flb_sds_create_len(cur->obj.via.map.ptr[i].key.via.str.ptr,
+                                                              cur->obj.via.map.ptr[i].key.via.str.size);
                 }
                 mk_list_add(&child->_head, &stack);
                 cur->cur_index = i + 1;
@@ -72,25 +77,32 @@ static int format_data(msgpack_object *data, flb_sds_t *out_buf, struct flb_oci_
             }
             else {
                 item = flb_calloc(1, sizeof(struct data_kv));
-                if(strcmp(cur->obj->via.map.ptr[i].key.via.str.ptr, "log") == 0 ||
-                   strcmp(cur->obj->via.map.ptr[i].key.via.str.ptr, "msg") == 0 ||
-                   strcmp(cur->obj->via.map.ptr[i].key.via.str.ptr, "message") == 0) {
+                if(strncmp(cur->obj.via.map.ptr[i].key.via.str.ptr, "log", 3) == 0 ||
+                   strncmp(cur->obj.via.map.ptr[i].key.via.str.ptr, "msg", 3) == 0 ||
+                   strncmp(cur->obj.via.map.ptr[i].key.via.str.ptr, "message", 7) == 0) {
                     item->key = flb_sds_create_len("msg", 3);
                     flb_plg_info(ctx->ins, "item_key = %s", item->key);
                 }
-                else if (cur->flattened_key != NULL) {
-                    item->key = flb_sds_create_size(256);
-                    flb_sds_snprintf(&item->key,
-                                     sizeof(item->key),
-                                     "%s.%s", cur->flattened_key,
-                                     cur->obj->via.map.ptr[i].key.via.str.ptr);
-                }
                 else {
-                    item->key = flb_sds_create_len(cur->obj->via.map.ptr[i].key.via.str.ptr,
-                                                   cur->obj->via.map.ptr[i].key.via.str.size);
+                    if (cur->flattened_key != NULL) {
+                        temp = flb_sds_create_len(cur->obj.via.map.ptr[i].key.via.str.ptr,
+                                                  cur->obj.via.map.ptr[i].key.via.str.size);
+                        item->key = flb_sds_create_size(flb_sds_len(temp) +
+                            flb_sds_len(cur->flattened_key) + 2);
+                        flb_sds_snprintf(&item->key,
+                                         flb_sds_alloc(item->key),
+                                         "%s.%s", cur->flattened_key,
+                                         temp);
+                        flb_sds_destroy(temp);
+                    } else {
+                        item->key = flb_sds_create_len(cur->obj.via.map.ptr[i].key.via.str.ptr,
+                                                       cur->obj.via.map.ptr[i].key.via.str.size);
+                    }
                 }
                 flb_plg_info(ctx->ins, "item_key = %s", item->key);
-                item->val = &cur->obj->via.map.ptr[i].val;
+                item->val = flb_sds_create_len(cur->obj.via.map.ptr[i].val.via.str.ptr,
+                                               cur->obj.via.map.ptr[i].val.via.str.size);
+                flb_plg_info(ctx->ins, "item val = %s", item->val);
                 mk_list_add(&item->_head, &data_list);
             }
         }
@@ -102,14 +114,30 @@ static int format_data(msgpack_object *data, flb_sds_t *out_buf, struct flb_oci_
 
     data_size = mk_list_size(&data_list);
     msgpack_pack_map(&data_pck, data_size);
-    while(mk_list_is_empty(&data_list) == -1) {
-        itr = mk_list_entry_last(&data_list, struct data_kv, _head);
-        msgpack_pack_str(&data_pck, flb_sds_len(item->key));
+    flb_plg_info(ctx->ins, "%d", data_size);
+    /*
+    mk_list_foreach_safe(head, tmp, &data_list) {
+        itr = mk_list_entry(&data_list, struct data_kv, _head);
+        flb_plg_info(ctx->ins, "key = %zu", flb_sds_len(itr->key));
+        msgpack_pack_str(&data_pck, flb_sds_len(itr->key));
         msgpack_pack_str_body(&data_pck, itr->key, flb_sds_len(itr->key));
-        msgpack_pack_object(&data_pck, *itr->val);
-        mk_list_del(&itr->_head);
-        flb_free(itr);
+        // flb_plg_info(ctx->ins, "val = %s", itr->val);
+        msgpack_pack_str(&data_pck, flb_sds_len(item->val));
+        msgpack_pack_str_body(&data_pck, itr->val, flb_sds_len(itr->val));
     }
+     */
+
+    while(mk_list_is_empty(&data_list) == -1) {
+        item = mk_list_entry_last(&data_list, struct data_kv, _head);
+        msgpack_pack_str(&data_pck, flb_sds_len(item->key));
+        flb_plg_info(ctx->ins, "key = %s", item->key);
+        msgpack_pack_str_body(&data_pck, item->key, flb_sds_len(item->key));
+        msgpack_pack_str(&data_pck, flb_sds_len(item->val));
+        msgpack_pack_str_body(&data_pck, item->val, flb_sds_len(item->val));
+        mk_list_del(&item->_head);
+        flb_free(item);
+    }
+
 
     *out_buf = flb_msgpack_raw_to_json_sds(data_sbuf.data, data_sbuf.size);
     msgpack_sbuffer_destroy(&data_sbuf);
@@ -173,9 +201,8 @@ static int flush_to_endpoint(struct flb_oci_logging *ctx,
         if (c->resp.status != 200) {
             flb_plg_info(ctx->ins, "request header %s", c->header_buf);
             out_ret = FLB_RETRY;
-            flb_plg_error(ctx->ins, "could not flush records to %s:%i (http_do=%i), retry=%s",
-                          ctx->ins->host.name, ctx->ins->host.port,
-                          http_ret, (out_ret == FLB_RETRY ? "true" : "false"));
+            flb_plg_error(ctx->ins, "could not flush records to %s:%i status = %d response = %s",
+                          ctx->ins->host.name, ctx->ins->host.port, c->resp.status, c->resp.payload);
         }
     }
     else {
@@ -259,8 +286,8 @@ static void cb_oci_logging_flush(struct flb_event_chunk *event_chunk,
     msgpack_pack_str(&mp_pck, 4);
     msgpack_pack_str_body(&mp_pck, "type", 4);
 
-    msgpack_pack_str(&mp_pck, 10);
-    msgpack_pack_str_body(&mp_pck, "sampleType", 10);
+    msgpack_pack_str(&mp_pck, strlen("com.oraclecloud.logging.custom.empty"));
+    msgpack_pack_str_body(&mp_pck, "com.oraclecloud.logging.custom.empty", strlen("com.oraclecloud.logging.custom.empty"));
 
     /*
     msgpack_pack_str(&mp_pck, 7);

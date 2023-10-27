@@ -17,7 +17,7 @@
 #include <fluent-bit/flb_sds.h>
 
 struct nested {
-    msgpack_object *obj;
+    msgpack_object obj;
     flb_sds_t flattened_key;
     int cur_index;
     int pop;
@@ -26,7 +26,7 @@ struct nested {
 
 struct data_kv {
     flb_sds_t key;
-    msgpack_object *val;
+    flb_sds_t val;
     struct mk_list _head;
 };
 
