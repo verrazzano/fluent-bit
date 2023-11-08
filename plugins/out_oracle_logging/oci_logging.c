@@ -360,10 +360,13 @@ static void cb_oci_logging_flush(struct flb_event_chunk *event_chunk,
     msgpack_sbuffer_destroy(&mp_sbuf);
     flb_log_event_decoder_destroy(&log_decoder);
 
-    flb_plg_info(ctx->ins, "payload = %s", out_buf);
+    flb_plg_debug(ctx->ins, "payload = %s", out_buf);
 
     // TODO: flush data
-    ret = flush_to_endpoint(ctx, out_buf);
+    ret = FLB_OK;
+    if (out_buf != NULL) {
+        ret = flush_to_endpoint(ctx, out_buf);
+    }
 
     if (ret == FLB_OK) {
         flb_plg_debug(ctx->ins, "success");
