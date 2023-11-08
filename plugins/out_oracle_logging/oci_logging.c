@@ -81,7 +81,6 @@ static int format_data(msgpack_object *data, flb_sds_t *out_buf, struct flb_oci_
                    strncmp(cur->obj.via.map.ptr[i].key.via.str.ptr, "msg", 3) == 0 ||
                    strncmp(cur->obj.via.map.ptr[i].key.via.str.ptr, "message", 7) == 0) {
                     item->key = flb_sds_create_len("msg", 3);
-                    flb_plg_info(ctx->ins, "item_key = %s", item->key);
                 }
                 else {
                     if (cur->flattened_key != NULL) {
@@ -99,10 +98,8 @@ static int format_data(msgpack_object *data, flb_sds_t *out_buf, struct flb_oci_
                                                        cur->obj.via.map.ptr[i].key.via.str.size);
                     }
                 }
-                flb_plg_info(ctx->ins, "item_key = %s", item->key);
                 item->val = flb_sds_create_len(cur->obj.via.map.ptr[i].val.via.str.ptr,
                                                cur->obj.via.map.ptr[i].val.via.str.size);
-                flb_plg_info(ctx->ins, "item val = %s", item->val);
                 mk_list_add(&item->_head, &data_list);
             }
         }
@@ -114,7 +111,7 @@ static int format_data(msgpack_object *data, flb_sds_t *out_buf, struct flb_oci_
 
     data_size = mk_list_size(&data_list);
     msgpack_pack_map(&data_pck, data_size);
-    flb_plg_info(ctx->ins, "%d", data_size);
+    flb_plg_debug(ctx->ins, "%d", data_size);
     /*
     mk_list_foreach_safe(head, tmp, &data_list) {
         itr = mk_list_entry(&data_list, struct data_kv, _head);
@@ -130,7 +127,6 @@ static int format_data(msgpack_object *data, flb_sds_t *out_buf, struct flb_oci_
     while(mk_list_is_empty(&data_list) == -1) {
         item = mk_list_entry_last(&data_list, struct data_kv, _head);
         msgpack_pack_str(&data_pck, flb_sds_len(item->key));
-        flb_plg_info(ctx->ins, "key = %s", item->key);
         msgpack_pack_str_body(&data_pck, item->key, flb_sds_len(item->key));
         msgpack_pack_str(&data_pck, flb_sds_len(item->val));
         msgpack_pack_str_body(&data_pck, item->val, flb_sds_len(item->val));
@@ -355,7 +351,7 @@ static void cb_oci_logging_flush(struct flb_event_chunk *event_chunk,
         msgpack_pack_str_body(&mp_pck, "data", 4);
 
         format_data(&map, &rec_data, ctx);
-        flb_plg_info(ctx->ins, "record: %s", rec_data);
+        flb_plg_debug(ctx->ins, "record: %s", rec_data);
         msgpack_pack_str(&mp_pck, flb_sds_len(rec_data));
         msgpack_pack_str_body(&mp_pck, rec_data, flb_sds_len(rec_data));
     }
