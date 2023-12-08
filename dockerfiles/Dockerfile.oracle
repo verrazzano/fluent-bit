@@ -1,4 +1,6 @@
-FROM ghcr.io/verrazzano/verrazzano-base-ol9:v1.0.0-20230627070315-744eefa as builder-base
+ARG BASE_IMAGE=ghcr.io/verrazzano/verrazzano-base-ol9:v1.0.0-20230627070315-744eefa
+ARG FINAL_IMAGE=ghcr.io/verrazzano/verrazzano-base-ol9:v1.0.0-20230627070315-744eefa
+FROM $BASE_IMAGE as builder-base
 
 RUN mkdir -p /fluent-bit/bin /fluent-bit/log /fluent-bit/rpm
 
@@ -58,7 +60,7 @@ RUN microdnf --enablerepo=ol9_codeready_builder download --nodocs -y \
     rpm2cpio ${rpm} | cpio -idmv -D /fluent-bit/rpm/; \
     done
 
-FROM ghcr.io/verrazzano/verrazzano-base-ol9:v1.0.0-20230627070315-744eefa
+FROM $FINAL_IMAGE
 WORKDIR /fluent-bit
 
 COPY conf/fluent-bit.conf \
